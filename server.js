@@ -6,6 +6,7 @@ const authRoutes = require("./routes/auth");
 const billingRoutes = require("./routes/billing");
 const oauthRoutes = require("./routes/oauth");
 const aiRoutes = require("./routes/ai");
+const waitlistRoutes = require("./routes/waitlist");
 
 const app = express();
 
@@ -37,6 +38,7 @@ app.use("/auth", authRoutes);
 app.use("/billing", billingRoutes);
 app.use("/oauth", oauthRoutes);
 app.use("/ai", aiRoutes);
+app.use("/waitlist", waitlistRoutes);
 
 // ─── 404 ─────────────────────────────────────────────────────────────────────
 app.use((_req, res) => res.status(404).json({ error: "Not found" }));
