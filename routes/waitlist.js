@@ -1,7 +1,11 @@
 const express = require("express");
+const cors = require("cors");
 const db = require("../db");
 
 const router = express.Router();
+
+// Waitlist is public — allow any origin (file://, web, Electron)
+router.use(cors());
 
 const VALID_SOURCES = ["real_estate", "restaurant", "retail"];
 
