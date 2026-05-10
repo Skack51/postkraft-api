@@ -7,7 +7,9 @@ const billingRoutes = require("./routes/billing");
 const oauthRoutes = require("./routes/oauth");
 const aiRoutes = require("./routes/ai");
 const socialRoutes = require("./routes/social");
+const scheduleRoutes = require("./routes/schedule");
 const waitlistRoutes = require("./routes/waitlist");
+const { startScheduler } = require("./lib/scheduler");
 
 const app = express();
 
@@ -41,6 +43,7 @@ app.use("/billing", billingRoutes);
 app.use("/oauth", oauthRoutes);
 app.use("/ai", aiRoutes);
 app.use("/social", socialRoutes);
+app.use("/schedule", scheduleRoutes);
 app.use("/waitlist", waitlistRoutes);
 
 // ─── 404 ─────────────────────────────────────────────────────────────────────
@@ -56,4 +59,5 @@ app.use((err, _req, res, _next) => {
 const PORT = process.env.PORT || 3000;
 app.listen(PORT, () => {
   console.log(`PostKraft API running on port ${PORT}`);
+  startScheduler();
 });

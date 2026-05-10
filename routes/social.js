@@ -70,6 +70,22 @@ async function uploadImageToCloudinary(base64Data) {
 }
 
 // ══════════════════════════════════════════════════════════════════════════════
+//  POST /social/upload-image
+//  Uploads a base64 image to Cloudinary and returns the public URL.
+//  Used by the scheduler flow so images are stored before scheduling.
+// ══════════════════════════════════════════════════════════════════════════════
+router.post("/upload-image", async (req, res, next) => {
+  try {
+    const { imageBase64 } = req.body;
+    if (!imageBase64) return res.status(400).json({ error: "imageBase64 required" });
+    const url = await uploadImageToCloudinary(imageBase64);
+    res.json({ url });
+  } catch (err) {
+    next(err);
+  }
+});
+
+// ══════════════════════════════════════════════════════════════════════════════
 //  POST /social/post
 //  Universal posting endpoint. Body:
 //  {
@@ -144,7 +160,21 @@ async function postToInstagram(userId, text, imageBase64) {
   const container = await containerRes.json();
   if (container.error) throw new Error(container.error.message);
 
-  // 4. Publish the container
+  // 4. Poll until Instagram finishes processing the image (required before publish)
+  let status = "";
+  for (let i = 0; i < 10; i++) {
+    await new Promise((r) => setTimeout(r, 2000));
+    const statusRes = await fetch(
+      `https://graph.facebook.com/v20.0/${container.id}?fields=status_code&access_token=${token.access_token}`
+    );
+    const statusData = await statusRes.json();
+    status = statusData.status_code;
+    if (status === "FINISHED") break;
+    if (status === "ERROR") throw new Error("Instagram media processing failed");
+  }
+  if (status !== "FINISHED") throw new Error("Instagram media processing timed out");
+
+  // 5. Publish the container
   const publishRes = await fetch(
     `https://graph.facebook.com/v20.0/${igAccount.id}/media_publish`,
     {
