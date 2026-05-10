@@ -16,19 +16,68 @@ const PLATFORM_SPECS = {
   instagram: {
     maxChars: 1200,
     hashtagCount: "10-15",
-    style: "Visual, aspirational, storytelling. Community hashtags. No emojis.",
+    style: "Visual, aspirational, storytelling. Community hashtags.",
   },
   facebook: {
     maxChars: 500,
     hashtagCount: "3-5",
-    style: "Conversational, informative, neighborhood-focused. No emojis.",
+    style: "Conversational, informative, neighborhood-focused.",
   },
   linkedin: {
     maxChars: 600,
     hashtagCount: "3-5",
-    style: "Professional, market insight angle, agent credibility. No emojis.",
+    style: "Professional, market insight angle, agent credibility.",
   },
 };
+
+// ─── POST /ai/generate ───────────────────────────────────────────────────────
+// Generic proxy used by the Electron app's aiCaptionGenerator.ts.
+// Body: { systemPrompt, userMessage, imageBase64? }
+// Returns the raw Anthropic response so the client can parse it.
+router.post("/generate", async (req, res, next) => {
+  try {
+    const { systemPrompt, userMessage, imageBase64 } = req.body;
+
+    if (!systemPrompt || !userMessage) {
+      return res.status(400).json({ error: "systemPrompt and userMessage are required" });
+    }
+
+    const userContent = [];
+    if (imageBase64) {
+      userContent.push({
+        type: "image",
+        source: { type: "base64", media_type: "image/jpeg", data: imageBase64 },
+      });
+    }
+    userContent.push({ type: "text", text: userMessage });
+
+    const anthropicRes = await fetch(ANTHROPIC_API_URL, {
+      method: "POST",
+      headers: {
+        "x-api-key": process.env.ANTHROPIC_API_KEY,
+        "anthropic-version": "2023-06-01",
+        "content-type": "application/json",
+      },
+      body: JSON.stringify({
+        model: MODEL,
+        max_tokens: 4096,
+        system: systemPrompt,
+        messages: [{ role: "user", content: userContent }],
+      }),
+    });
+
+    if (!anthropicRes.ok) {
+      const err = await anthropicRes.text();
+      console.error("Anthropic API error:", err);
+      return res.status(502).json({ error: "AI service error — please try again" });
+    }
+
+    const data = await anthropicRes.json();
+    res.json(data);
+  } catch (err) {
+    next(err);
+  }
+});
 
 // ─── POST /ai/caption ─────────────────────────────────────────────────────────
 // Body: {
@@ -88,9 +137,8 @@ Agent profile:
 `.trim()
       : "";
 
-    const systemPrompt = `You are an expert real estate social media copywriter.
+    const systemPrompt = `You are an expert social media copywriter.
 Write captions that are confident, specific, and human — no generic filler, no clichés like "stunning" or "breathtaking".
-CRITICAL: NO EMOJIS — never include emojis, emoji characters, or pictographs anywhere in your response.
 Return ONLY valid JSON. No markdown, no explanation, just the JSON object.`;
 
     const userPrompt = `Look at this real estate photo and write captions for: ${platforms.join(", ")}.
@@ -137,11 +185,9 @@ Return this exact JSON structure (only include keys for requested platforms):
     const anthropicData = await anthropicRes.json();
     const rawText = anthropicData.content?.[0]?.text || "{}";
 
-    // Parse and scrub emojis defensively
     let captions;
     try {
       captions = JSON.parse(rawText);
-      captions = scrubEmojis(captions);
     } catch {
       console.error("Failed to parse AI response:", rawText);
       return res.status(502).json({ error: "AI returned unexpected format — please try again" });
@@ -152,19 +198,5 @@ Return this exact JSON structure (only include keys for requested platforms):
     next(err);
   }
 });
-
-// ─── Emoji scrubber ───────────────────────────────────────────────────────────
-// Strips Unicode emoji ranges from all string values recursively
-const EMOJI_REGEX =
-  /[\u{1F300}-\u{1F9FF}\u{2600}-\u{26FF}\u{2700}-\u{27BF}\u{FE00}-\u{FE0F}\u{1F000}-\u{1F02F}\u{1F0A0}-\u{1F0FF}\u{1F100}-\u{1F1FF}\u{1F200}-\u{1F2FF}\u{1F004}\u{1F0CF}]/gu;
-
-function scrubEmojis(obj) {
-  if (typeof obj === "string") return obj.replace(EMOJI_REGEX, "").trim();
-  if (Array.isArray(obj)) return obj.map(scrubEmojis);
-  if (obj && typeof obj === "object") {
-    return Object.fromEntries(Object.entries(obj).map(([k, v]) => [k, scrubEmojis(v)]));
-  }
-  return obj;
-}
 
 module.exports = router;
