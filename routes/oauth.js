@@ -34,7 +34,131 @@ router.get("/connections", requireAuth, async (req, res, next) => {
   }
 });
 
-// All other OAuth routes require a valid, active subscription
+// ── OAuth callbacks are PUBLIC — called by Facebook/LinkedIn redirect, no JWT ──
+
+// GET /oauth/meta/callback
+router.get("/meta/callback", async (req, res, next) => {
+  try {
+    const { code, state, error } = req.query;
+
+    if (error) {
+      return res.redirect(`postkraft://oauth/meta/error?message=${encodeURIComponent(error)}`);
+    }
+
+    let user_id;
+    try {
+      ({ user_id } = JSON.parse(Buffer.from(state, "base64url").toString()));
+    } catch {
+      return res.status(400).json({ error: "Invalid state parameter" });
+    }
+
+    const tokenRes = await fetch(
+      `https://graph.facebook.com/v20.0/oauth/access_token?` +
+        new URLSearchParams({
+          client_id: process.env.META_APP_ID,
+          client_secret: process.env.META_APP_SECRET,
+          redirect_uri: process.env.META_REDIRECT_URI,
+          code,
+        })
+    );
+    const tokenData = await tokenRes.json();
+    if (tokenData.error) throw new Error(tokenData.error.message);
+
+    const longLivedRes = await fetch(
+      `https://graph.facebook.com/v20.0/oauth/access_token?` +
+        new URLSearchParams({
+          grant_type: "fb_exchange_token",
+          client_id: process.env.META_APP_ID,
+          client_secret: process.env.META_APP_SECRET,
+          fb_exchange_token: tokenData.access_token,
+        })
+    );
+    const longLived = await longLivedRes.json();
+    if (longLived.error) throw new Error(longLived.error.message);
+
+    const meRes = await fetch(
+      `https://graph.facebook.com/v20.0/me?fields=id,name&access_token=${longLived.access_token}`
+    );
+    const me = await meRes.json();
+
+    const expiresAt = longLived.expires_in
+      ? new Date(Date.now() + longLived.expires_in * 1000)
+      : null;
+
+    await db.query(
+      `INSERT INTO oauth_tokens (user_id, platform, access_token, token_expires_at, meta_user_id)
+       VALUES ($1, 'meta', $2, $3, $4)
+       ON CONFLICT (user_id, platform) DO UPDATE SET
+         access_token     = EXCLUDED.access_token,
+         token_expires_at = EXCLUDED.token_expires_at,
+         meta_user_id     = EXCLUDED.meta_user_id,
+         updated_at       = NOW()`,
+      [user_id, longLived.access_token, expiresAt, me.id]
+    );
+
+    res.redirect(`postkraft://oauth/meta/success`);
+  } catch (err) {
+    next(err);
+  }
+});
+
+// GET /oauth/linkedin/callback
+router.get("/linkedin/callback", async (req, res, next) => {
+  try {
+    const { code, state, error } = req.query;
+
+    if (error) {
+      return res.redirect(`postkraft://oauth/linkedin/error?message=${encodeURIComponent(error)}`);
+    }
+
+    let user_id;
+    try {
+      ({ user_id } = JSON.parse(Buffer.from(state, "base64url").toString()));
+    } catch {
+      return res.status(400).json({ error: "Invalid state parameter" });
+    }
+
+    const tokenRes = await fetch("https://www.linkedin.com/oauth/v2/accessToken", {
+      method: "POST",
+      headers: { "Content-Type": "application/x-www-form-urlencoded" },
+      body: new URLSearchParams({
+        grant_type: "authorization_code",
+        code,
+        redirect_uri: process.env.LINKEDIN_REDIRECT_URI,
+        client_id: process.env.LINKEDIN_CLIENT_ID,
+        client_secret: process.env.LINKEDIN_CLIENT_SECRET,
+      }),
+    });
+    const tokenData = await tokenRes.json();
+    if (tokenData.error) throw new Error(tokenData.error_description || tokenData.error);
+
+    const profileRes = await fetch("https://api.linkedin.com/v2/userinfo", {
+      headers: { Authorization: `Bearer ${tokenData.access_token}` },
+    });
+    const profile = await profileRes.json();
+
+    const expiresAt = tokenData.expires_in
+      ? new Date(Date.now() + tokenData.expires_in * 1000)
+      : null;
+
+    await db.query(
+      `INSERT INTO oauth_tokens (user_id, platform, access_token, token_expires_at, linkedin_urn)
+       VALUES ($1, 'linkedin', $2, $3, $4)
+       ON CONFLICT (user_id, platform) DO UPDATE SET
+         access_token     = EXCLUDED.access_token,
+         token_expires_at = EXCLUDED.token_expires_at,
+         linkedin_urn     = EXCLUDED.linkedin_urn,
+         updated_at       = NOW()`,
+      [user_id, tokenData.access_token, expiresAt, profile.sub]
+    );
+
+    res.redirect(`postkraft://oauth/linkedin/success`);
+  } catch (err) {
+    next(err);
+  }
+});
+
+// All other OAuth routes require auth + active subscription
 router.use(requireAuth, requireSubscription);
 
 // ══════════════════════════════════════════════════════════════════════════════
@@ -81,78 +205,6 @@ router.get("/meta/start", (req, res) => {
   res.redirect(url.toString());
 });
 
-// GET /oauth/meta/callback
-// Facebook redirects here with ?code=... after consent.
-router.get("/meta/callback", async (req, res, next) => {
-  try {
-    const { code, state, error } = req.query;
-
-    if (error) {
-      return res.redirect(`postkraft://oauth/meta/error?message=${encodeURIComponent(error)}`);
-    }
-
-    // Decode state to get user_id
-    let user_id;
-    try {
-      ({ user_id } = JSON.parse(Buffer.from(state, "base64url").toString()));
-    } catch {
-      return res.status(400).json({ error: "Invalid state parameter" });
-    }
-
-    // Exchange code for short-lived user access token
-    const tokenRes = await fetch(
-      `https://graph.facebook.com/v20.0/oauth/access_token?` +
-        new URLSearchParams({
-          client_id: process.env.META_APP_ID,
-          client_secret: process.env.META_APP_SECRET,
-          redirect_uri: process.env.META_REDIRECT_URI,
-          code,
-        })
-    );
-    const tokenData = await tokenRes.json();
-    if (tokenData.error) throw new Error(tokenData.error.message);
-
-    // Exchange for long-lived token (valid ~60 days)
-    const longLivedRes = await fetch(
-      `https://graph.facebook.com/v20.0/oauth/access_token?` +
-        new URLSearchParams({
-          grant_type: "fb_exchange_token",
-          client_id: process.env.META_APP_ID,
-          client_secret: process.env.META_APP_SECRET,
-          fb_exchange_token: tokenData.access_token,
-        })
-    );
-    const longLived = await longLivedRes.json();
-    if (longLived.error) throw new Error(longLived.error.message);
-
-    // Get the user's Meta ID
-    const meRes = await fetch(
-      `https://graph.facebook.com/v20.0/me?fields=id,name&access_token=${longLived.access_token}`
-    );
-    const me = await meRes.json();
-
-    const expiresAt = longLived.expires_in
-      ? new Date(Date.now() + longLived.expires_in * 1000)
-      : null;
-
-    // Upsert token
-    await db.query(
-      `INSERT INTO oauth_tokens (user_id, platform, access_token, token_expires_at, meta_user_id)
-       VALUES ($1, 'meta', $2, $3, $4)
-       ON CONFLICT (user_id, platform) DO UPDATE SET
-         access_token     = EXCLUDED.access_token,
-         token_expires_at = EXCLUDED.token_expires_at,
-         meta_user_id     = EXCLUDED.meta_user_id,
-         updated_at       = NOW()`,
-      [user_id, longLived.access_token, expiresAt, me.id]
-    );
-
-    // Deep-link back to Electron — success
-    res.redirect(`postkraft://oauth/meta/success`);
-  } catch (err) {
-    next(err);
-  }
-});
 
 // GET /oauth/meta/token
 // Electron calls this to get the stored Meta token for the current user.
@@ -216,63 +268,6 @@ router.get("/linkedin/start", (req, res) => {
   res.redirect(url.toString());
 });
 
-// GET /oauth/linkedin/callback
-router.get("/linkedin/callback", async (req, res, next) => {
-  try {
-    const { code, state, error } = req.query;
-
-    if (error) {
-      return res.redirect(`postkraft://oauth/linkedin/error?message=${encodeURIComponent(error)}`);
-    }
-
-    let user_id;
-    try {
-      ({ user_id } = JSON.parse(Buffer.from(state, "base64url").toString()));
-    } catch {
-      return res.status(400).json({ error: "Invalid state parameter" });
-    }
-
-    // Exchange code for access token
-    const tokenRes = await fetch("https://www.linkedin.com/oauth/v2/accessToken", {
-      method: "POST",
-      headers: { "Content-Type": "application/x-www-form-urlencoded" },
-      body: new URLSearchParams({
-        grant_type: "authorization_code",
-        code,
-        redirect_uri: process.env.LINKEDIN_REDIRECT_URI,
-        client_id: process.env.LINKEDIN_CLIENT_ID,
-        client_secret: process.env.LINKEDIN_CLIENT_SECRET,
-      }),
-    });
-    const tokenData = await tokenRes.json();
-    if (tokenData.error) throw new Error(tokenData.error_description || tokenData.error);
-
-    // Get LinkedIn URN via OpenID Connect userinfo
-    const profileRes = await fetch("https://api.linkedin.com/v2/userinfo", {
-      headers: { Authorization: `Bearer ${tokenData.access_token}` },
-    });
-    const profile = await profileRes.json();
-
-    const expiresAt = tokenData.expires_in
-      ? new Date(Date.now() + tokenData.expires_in * 1000)
-      : null;
-
-    await db.query(
-      `INSERT INTO oauth_tokens (user_id, platform, access_token, token_expires_at, linkedin_urn)
-       VALUES ($1, 'linkedin', $2, $3, $4)
-       ON CONFLICT (user_id, platform) DO UPDATE SET
-         access_token     = EXCLUDED.access_token,
-         token_expires_at = EXCLUDED.token_expires_at,
-         linkedin_urn     = EXCLUDED.linkedin_urn,
-         updated_at       = NOW()`,
-      [user_id, tokenData.access_token, expiresAt, profile.sub]
-    );
-
-    res.redirect(`postkraft://oauth/linkedin/success`);
-  } catch (err) {
-    next(err);
-  }
-});
 
 // GET /oauth/linkedin/token
 router.get("/linkedin/token", async (req, res, next) => {
