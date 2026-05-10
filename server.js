@@ -22,7 +22,7 @@ app.use(
   cors({
     origin: (origin, cb) => {
       // Allow Electron (no origin), localhost dev, and future web app
-      const allowed = [undefined, null, "null", "http://localhost:5173", "https://postkraft.com"];
+      const allowed = [undefined, null, "null", "http://localhost:5173", "https://postkraft.app", "https://www.postkraft.app"];
       if (!origin || allowed.includes(origin)) return cb(null, true);
       cb(new Error("Not allowed by CORS"));
     },
