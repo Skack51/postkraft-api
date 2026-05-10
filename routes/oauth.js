@@ -1,5 +1,5 @@
 const express = require("express");
-const fetch = require("node-fetch");
+// fetch is available globally in Node 18+ — no import needed
 const db = require("../db");
 const requireAuth = require("../middleware/requireAuth");
 const requireSubscription = require("../middleware/requireSubscription");
