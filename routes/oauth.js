@@ -6,7 +6,35 @@ const requireSubscription = require("../middleware/requireSubscription");
 
 const router = express.Router();
 
-// All OAuth routes require a valid, active subscription
+// ── GET /oauth/connections ─────────────────────────────────────────────────────
+// Returns which platforms the current user has connected.
+// Public-facing check — requires auth but NOT subscription (so users can connect
+// before their trial starts).
+router.get("/connections", requireAuth, async (req, res, next) => {
+  try {
+    const { rows } = await db.query(
+      `SELECT platform, meta_user_id, linkedin_urn, token_expires_at
+       FROM oauth_tokens WHERE user_id = $1`,
+      [req.user.id]
+    );
+    const result = {
+      meta: null,
+      linkedin: null,
+    };
+    for (const row of rows) {
+      if (row.platform === "meta") {
+        result.meta = { connected: true, metaUserId: row.meta_user_id };
+      } else if (row.platform === "linkedin") {
+        result.linkedin = { connected: true, linkedinUrn: row.linkedin_urn };
+      }
+    }
+    res.json(result);
+  } catch (err) {
+    next(err);
+  }
+});
+
+// All other OAuth routes require a valid, active subscription
 router.use(requireAuth, requireSubscription);
 
 // ══════════════════════════════════════════════════════════════════════════════
@@ -22,6 +50,20 @@ const META_SCOPES = [
   "instagram_basic",
   "instagram_content_publish",
 ].join(",");
+
+// GET /oauth/meta/url
+// Returns the Facebook OAuth URL as JSON so the Electron app can open it
+// in the system browser without needing to redirect with a JWT.
+router.get("/meta/url", (req, res) => {
+  const state = Buffer.from(JSON.stringify({ user_id: req.user.id })).toString("base64url");
+  const url = new URL("https://www.facebook.com/v20.0/dialog/oauth");
+  url.searchParams.set("client_id", process.env.META_APP_ID);
+  url.searchParams.set("redirect_uri", process.env.META_REDIRECT_URI);
+  url.searchParams.set("scope", META_SCOPES);
+  url.searchParams.set("response_type", "code");
+  url.searchParams.set("state", state);
+  res.json({ url: url.toString() });
+});
 
 // GET /oauth/meta/start
 // Redirects the user's browser to Facebook OAuth consent screen.
@@ -146,6 +188,19 @@ router.delete("/meta/disconnect", async (req, res, next) => {
 // ══════════════════════════════════════════════════════════════════════════════
 
 const LINKEDIN_SCOPES = "openid profile email w_member_social";
+
+// GET /oauth/linkedin/url
+// Returns the LinkedIn OAuth URL as JSON for the Electron app.
+router.get("/linkedin/url", (req, res) => {
+  const state = Buffer.from(JSON.stringify({ user_id: req.user.id })).toString("base64url");
+  const url = new URL("https://www.linkedin.com/oauth/v2/authorization");
+  url.searchParams.set("response_type", "code");
+  url.searchParams.set("client_id", process.env.LINKEDIN_CLIENT_ID);
+  url.searchParams.set("redirect_uri", process.env.LINKEDIN_REDIRECT_URI);
+  url.searchParams.set("scope", LINKEDIN_SCOPES);
+  url.searchParams.set("state", state);
+  res.json({ url: url.toString() });
+});
 
 // GET /oauth/linkedin/start
 router.get("/linkedin/start", (req, res) => {
