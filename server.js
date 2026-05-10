@@ -14,7 +14,8 @@ const app = express();
 app.use("/billing/webhook", express.raw({ type: "application/json" }));
 
 // ─── Everything else gets JSON ───────────────────────────────────────────────
-app.use(express.json());
+// 10mb limit to accommodate base64-encoded images in AI requests
+app.use(express.json({ limit: "10mb" }));
 
 // ─── CORS ────────────────────────────────────────────────────────────────────
 // Allow requests from the Electron app (file://) and future web dashboard
