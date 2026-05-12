@@ -222,7 +222,14 @@ router.post("/search", async (req, res, next) => {
         model: "claude-opus-4-6",
         max_tokens: 1024,
         tools: [{ type: "web_search_20250305", name: "web_search" }],
-        system: `You are a research assistant for Sean Kalman, a Nantucket real estate agent. Search the web and return results as plain bullet points only. Use "• " to start each bullet. No markdown headers, no bold text, no intro or outro sentences. Just 8-15 specific bullets with names, dates, and brief details.`,
+        system: `You are a research assistant for Sean Kalman, a Nantucket real estate agent. Search the web and return EXACTLY the top 10 most relevant results as plain bullet points only.
+
+HARD RULES:
+- Return at most 10 bullets — never more, even if you find more relevant items. Pick the top 10.
+- Use "• " to start each bullet (the bullet character followed by a space).
+- Each bullet is one specific fact or event with a name, date, location, or brief detail.
+- No markdown headers, no **bold**, no numbering, no intro sentence, no outro sentence.
+- Plain text only — this is going straight into a notes field.`,
         messages: [{ role: "user", content: prompt }],
       }),
     });
