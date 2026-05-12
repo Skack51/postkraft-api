@@ -20,28 +20,10 @@ async function getToken(userId, platform) {
 }
 
 // ─── Twitter posting ───────────────────────────────────────────────────────────
-async function postToTwitter(userId, text, imageBase64) {
+// Note: Twitter v1.1 media upload requires OAuth 1.0a — not supported with OAuth 2.0 PKCE.
+// Posting text-only for now; image support requires OAuth 1.0a app credentials.
+async function postToTwitter(userId, text, _imageBase64) {
   const token = await getToken(userId, "twitter");
-
-  let mediaId;
-  if (imageBase64) {
-    // Strip data URL prefix if present
-    const base64Data = imageBase64.replace(/^data:image\/\w+;base64,/, "");
-    const uploadRes = await fetch("https://upload.twitter.com/1.1/media/upload.json", {
-      method: "POST",
-      headers: {
-        Authorization: `Bearer ${token.access_token}`,
-        "Content-Type": "application/x-www-form-urlencoded",
-      },
-      body: new URLSearchParams({ media_data: base64Data }),
-    });
-    const uploadData = await uploadRes.json();
-    if (uploadData.errors) throw new Error(uploadData.errors[0]?.message || "Twitter media upload failed");
-    mediaId = uploadData.media_id_string;
-  }
-
-  const body = { text };
-  if (mediaId) body.media = { media_ids: [mediaId] };
 
   const postRes = await fetch("https://api.twitter.com/2/tweets", {
     method: "POST",
@@ -49,8 +31,14 @@ async function postToTwitter(userId, text, imageBase64) {
       Authorization: `Bearer ${token.access_token}`,
       "Content-Type": "application/json",
     },
-    body: JSON.stringify(body),
+    body: JSON.stringify({ text }),
   });
+
+  if (!postRes.ok) {
+    const errText = await postRes.text();
+    throw new Error(`Twitter API error ${postRes.status}: ${errText}`);
+  }
+
   const post = await postRes.json();
   if (post.errors) throw new Error(post.errors[0]?.message || "Tweet failed");
   return { success: true, postId: post.data?.id, platform: "twitter" };
