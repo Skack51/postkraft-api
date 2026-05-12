@@ -25,7 +25,7 @@ CREATE TABLE IF NOT EXISTS users (
 CREATE TABLE IF NOT EXISTS oauth_tokens (
   id              UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   user_id         UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
-  platform        TEXT NOT NULL,  -- 'meta' | 'linkedin'
+  platform        TEXT NOT NULL,  -- 'meta' | 'linkedin' | 'twitter' | 'pinterest'
   access_token    TEXT NOT NULL,
   refresh_token   TEXT,
   token_expires_at TIMESTAMPTZ,
@@ -35,6 +35,12 @@ CREATE TABLE IF NOT EXISTS oauth_tokens (
   meta_page_name  TEXT,
   -- LinkedIn-specific
   linkedin_urn    TEXT,
+  -- Twitter-specific
+  twitter_user_id  TEXT,
+  twitter_username TEXT,
+  -- Pinterest-specific
+  pinterest_user_id  TEXT,
+  pinterest_username TEXT,
   -- Timestamps
   created_at      TIMESTAMPTZ NOT NULL DEFAULT NOW(),
   updated_at      TIMESTAMPTZ NOT NULL DEFAULT NOW(),

@@ -199,4 +199,48 @@ Return this exact JSON structure (only include keys for requested platforms):
   }
 });
 
+// ─── POST /ai/search ─────────────────────────────────────────────────────────
+// Body: { prompt, theme? }
+// Returns: { result: string }
+router.post("/search", async (req, res, next) => {
+  try {
+    const { prompt } = req.body;
+
+    if (!prompt) {
+      return res.status(400).json({ error: "prompt is required" });
+    }
+
+    const anthropicRes = await fetch(ANTHROPIC_API_URL, {
+      method: "POST",
+      headers: {
+        "x-api-key": process.env.ANTHROPIC_API_KEY,
+        "anthropic-version": "2023-06-01",
+        "anthropic-beta": "web-search-2025-03-05",
+        "content-type": "application/json",
+      },
+      body: JSON.stringify({
+        model: "claude-opus-4-6",
+        max_tokens: 1024,
+        tools: [{ type: "web_search_20250305", name: "web_search" }],
+        system: `You are a research assistant for Sean Kalman, a Nantucket real estate agent. Search the web and return results as plain bullet points only. Use "• " to start each bullet. No markdown headers, no bold text, no intro or outro sentences. Just 8-15 specific bullets with names, dates, and brief details.`,
+        messages: [{ role: "user", content: prompt }],
+      }),
+    });
+
+    if (!anthropicRes.ok) {
+      const err = await anthropicRes.text();
+      console.error("Anthropic web search error:", err);
+      return res.status(502).json({ error: "Search failed — please try again" });
+    }
+
+    const data = await anthropicRes.json();
+    const textBlock = data.content?.find((b) => b.type === "text");
+    const result = textBlock?.text ?? "No results returned.";
+
+    res.json({ result });
+  } catch (err) {
+    next(err);
+  }
+});
+
 module.exports = router;
