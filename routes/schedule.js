@@ -47,13 +47,22 @@ router.get("/", async (req, res, next) => {
 });
 
 // ── DELETE /schedule/:id — cancel a scheduled post ────────────────────────────
+// Allows canceling posts in 'pending' or 'failed' state so the user can pull
+// them back into the Library to edit. Returns 404 when the row didn't update
+// (already sent, already canceled, or belongs to another user) so the client
+// stops thinking it succeeded and can surface a real error.
 router.delete("/:id", async (req, res, next) => {
   try {
-    await db.query(
+    const { rowCount } = await db.query(
       `UPDATE scheduled_posts SET status = 'canceled'
-       WHERE id = $1 AND user_id = $2 AND status = 'pending'`,
+       WHERE id = $1 AND user_id = $2 AND status IN ('pending', 'failed')`,
       [req.params.id, req.user.id]
     );
+    if (rowCount === 0) {
+      return res.status(404).json({
+        error: "Post could not be canceled — it may have already been sent, canceled, or belongs to another account.",
+      });
+    }
     res.json({ success: true });
   } catch (err) {
     next(err);
