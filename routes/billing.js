@@ -20,8 +20,10 @@ router.post("/subscribe", requireAuth, async (req, res, next) => {
       mode: "subscription",
       payment_method_types: ["card"],
       line_items: [{ price: process.env.STRIPE_PRICE_ID, quantity: 1 }],
-      // 7-day free trial
+      // 7-day free trial (overridden to 30 days when CONFERENCE26 coupon is applied)
       subscription_data: { trial_period_days: 7 },
+      // Let users enter promo codes at checkout (e.g. CONFERENCE26 = 30 days free)
+      allow_promotion_codes: true,
       // After checkout, deep-link back into the Electron app
       success_url: `postkraft://billing/success?session_id={CHECKOUT_SESSION_ID}`,
       cancel_url:  `postkraft://billing/cancel`,
@@ -63,6 +65,38 @@ router.post("/portal", requireAuth, async (req, res, next) => {
     });
 
     res.json({ portal_url: session.url });
+  } catch (err) {
+    next(err);
+  }
+});
+
+// ─── POST /billing/cancel ─────────────────────────────────────────────────────
+// Cancels the subscription at the end of the current billing period.
+// The user keeps access until the period ends — no immediate cutoff.
+router.post("/cancel", requireAuth, async (req, res, next) => {
+  try {
+    const { rows } = await db.query(
+      "SELECT subscription_id FROM users WHERE id = $1",
+      [req.user.id]
+    );
+
+    const subscriptionId = rows[0]?.subscription_id;
+    if (!subscriptionId) {
+      return res.status(400).json({ error: "No active subscription found" });
+    }
+
+    await stripe.subscriptions.update(subscriptionId, {
+      cancel_at_period_end: true,
+    });
+
+    // Reflect this in our DB immediately so the UI can update
+    await db.query(
+      `UPDATE users SET subscription_status = 'canceled' WHERE id = $1`,
+      [req.user.id]
+    );
+
+    console.log(`🚫 Subscription scheduled for cancellation: ${subscriptionId}`);
+    res.json({ success: true });
   } catch (err) {
     next(err);
   }
