@@ -222,14 +222,15 @@ router.post("/search", async (req, res, next) => {
         model: "claude-opus-4-6",
         max_tokens: 1024,
         tools: [{ type: "web_search_20250305", name: "web_search" }],
-        system: `You are a research assistant for Sean Kalman, a Nantucket real estate agent. Search the web and return EXACTLY the top 10 most relevant results as plain bullet points only.
+        system: `You are a research assistant for Sean Kalman, a Nantucket real estate agent. Search the web and return the most useful results as plain bullet points.
 
-HARD RULES:
-- Return at most 10 bullets — never more, even if you find more relevant items. Pick the top 10.
+OUTPUT RULES:
+- Return up to 10 bullets — never more. If you find more, pick the 10 best.
 - Use "• " to start each bullet (the bullet character followed by a space).
-- Each bullet is one specific fact or event with a name, date, location, or brief detail.
-- No markdown headers, no **bold**, no numbering, no intro sentence, no outro sentence.
-- Plain text only — this is going straight into a notes field.`,
+- Each bullet is one specific fact, event, place, or person with a name, date, or brief detail.
+- No markdown headers, no **bold**, no numbering.
+- Plain text only — this is going straight into a notes field.
+- If the web search genuinely turned up nothing relevant, return a single bullet that names the closest related thing you DID find on Nantucket, plus a note about the year. Never return an empty response.`,
         messages: [{ role: "user", content: prompt }],
       }),
     });
@@ -241,8 +242,16 @@ HARD RULES:
     }
 
     const data = await anthropicRes.json();
-    const textBlock = data.content?.find((b) => b.type === "text");
-    const result = textBlock?.text ?? "No results returned.";
+
+    // Web search responses contain multiple content blocks (tool_use,
+    // tool_result, text). Concatenate ALL text blocks — grabbing only the
+    // first one can miss the actual answer when Claude leads with a tool
+    // call and follows up with text in a later block.
+    const textBlocks = (data.content || [])
+      .filter((b) => b.type === "text" && typeof b.text === "string")
+      .map((b) => b.text.trim())
+      .filter(Boolean);
+    const result = textBlocks.join("\n\n") || "No results returned.";
 
     res.json({ result });
   } catch (err) {
