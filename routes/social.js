@@ -19,6 +19,43 @@ async function getToken(userId, platform) {
   return rows[0];
 }
 
+// ─── Twitter posting ───────────────────────────────────────────────────────────
+async function postToTwitter(userId, text, imageBase64) {
+  const token = await getToken(userId, "twitter");
+
+  let mediaId;
+  if (imageBase64) {
+    // Strip data URL prefix if present
+    const base64Data = imageBase64.replace(/^data:image\/\w+;base64,/, "");
+    const uploadRes = await fetch("https://upload.twitter.com/1.1/media/upload.json", {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${token.access_token}`,
+        "Content-Type": "application/x-www-form-urlencoded",
+      },
+      body: new URLSearchParams({ media_data: base64Data }),
+    });
+    const uploadData = await uploadRes.json();
+    if (uploadData.errors) throw new Error(uploadData.errors[0]?.message || "Twitter media upload failed");
+    mediaId = uploadData.media_id_string;
+  }
+
+  const body = { text };
+  if (mediaId) body.media = { media_ids: [mediaId] };
+
+  const postRes = await fetch("https://api.twitter.com/2/tweets", {
+    method: "POST",
+    headers: {
+      Authorization: `Bearer ${token.access_token}`,
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify(body),
+  });
+  const post = await postRes.json();
+  if (post.errors) throw new Error(post.errors[0]?.message || "Tweet failed");
+  return { success: true, postId: post.data?.id, platform: "twitter" };
+}
+
 // ─── Helper: upload image to Cloudinary and return URL ───────────────────────
 // We use Cloudinary as a temporary image host since both Meta and LinkedIn
 // require a publicly accessible URL (not base64).
@@ -113,6 +150,8 @@ router.post("/post", async (req, res, next) => {
         return res.json(await postToFacebook(req.user.id, fullText, imageBase64));
       case "linkedin":
         return res.json(await postToLinkedIn(req.user.id, fullText, imageBase64));
+      case "twitter":
+        return res.json(await postToTwitter(req.user.id, fullText, imageBase64));
       default:
         return res.status(400).json({ error: `Unsupported platform: ${platform}` });
     }
