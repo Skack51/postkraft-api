@@ -1,0 +1,323 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>PostKraft — Your Free Month Starts Here</title>
+  <meta name="robots" content="noindex, nofollow" />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&display=swap" rel="stylesheet" />
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    :root {
+      --bg:        #07070f;
+      --bg2:       #0d0d1a;
+      --border:    rgba(255,255,255,0.07);
+      --violet:    #7c3aed;
+      --fuchsia:   #a855f7;
+      --text:      #f1f0ff;
+      --muted:     rgba(255,255,255,0.45);
+    }
+
+    body {
+      font-family: 'Inter', -apple-system, sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      line-height: 1.6;
+      -webkit-font-smoothing: antialiased;
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      padding: 2rem 1.5rem;
+    }
+
+    .card {
+      width: 100%;
+      max-width: 480px;
+      text-align: center;
+    }
+
+    /* Logo */
+    .logo {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 10px;
+      margin-bottom: 2.5rem;
+    }
+    .logo-k {
+      width: 36px;
+      height: 36px;
+      border-radius: 9px;
+      background: linear-gradient(135deg, #6366f1, #a855f7, #ec4899);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+    .logo-k svg { width: 20px; height: 20px; }
+    .logo-name {
+      font-size: 1.2rem;
+      font-weight: 700;
+      letter-spacing: -0.02em;
+    }
+
+    /* Badge */
+    .badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 7px;
+      padding: 5px 14px;
+      border-radius: 999px;
+      border: 1px solid rgba(167,139,250,0.3);
+      background: rgba(167,139,250,0.08);
+      font-size: 0.75rem;
+      font-weight: 600;
+      letter-spacing: 0.05em;
+      text-transform: uppercase;
+      color: #a78bfa;
+      margin-bottom: 1.75rem;
+    }
+    .badge-dot {
+      width: 6px;
+      height: 6px;
+      border-radius: 50%;
+      background: #a78bfa;
+    }
+
+    h1 {
+      font-size: clamp(2rem, 6vw, 2.75rem);
+      font-weight: 800;
+      letter-spacing: -0.04em;
+      line-height: 1.1;
+      margin-bottom: 1rem;
+    }
+    h1 .gradient {
+      background: linear-gradient(90deg, #818cf8, #c084fc, #f472b6);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      background-clip: text;
+    }
+
+    .sub {
+      font-size: 1rem;
+      color: var(--muted);
+      line-height: 1.65;
+      margin-bottom: 2.5rem;
+      max-width: 380px;
+      margin-left: auto;
+      margin-right: auto;
+    }
+
+    /* Offer block */
+    .offer {
+      background: rgba(255,255,255,0.03);
+      border: 1px solid rgba(255,255,255,0.07);
+      border-radius: 16px;
+      padding: 1.75rem;
+      margin-bottom: 2rem;
+    }
+    .offer-label {
+      font-size: 0.7rem;
+      font-weight: 600;
+      letter-spacing: 0.12em;
+      text-transform: uppercase;
+      color: rgba(255,255,255,0.3);
+      margin-bottom: 0.5rem;
+    }
+    .offer-value {
+      font-size: 2.25rem;
+      font-weight: 800;
+      letter-spacing: -0.03em;
+      color: #ffffff;
+      margin-bottom: 0.4rem;
+    }
+    .offer-desc {
+      font-size: 0.875rem;
+      color: var(--muted);
+    }
+
+    /* Form */
+    .form {
+      display: flex;
+      flex-direction: column;
+      gap: 0.75rem;
+      margin-bottom: 1rem;
+    }
+    .form input {
+      width: 100%;
+      padding: 0.875rem 1.125rem;
+      background: rgba(255,255,255,0.05);
+      border: 1px solid rgba(255,255,255,0.1);
+      border-radius: 10px;
+      color: var(--text);
+      font-size: 1rem;
+      font-family: inherit;
+      outline: none;
+      transition: border-color 0.15s;
+    }
+    .form input::placeholder { color: var(--muted); }
+    .form input:focus { border-color: rgba(124,42,232,0.5); }
+    .form button {
+      width: 100%;
+      padding: 0.875rem;
+      background: linear-gradient(135deg, var(--violet), var(--fuchsia));
+      border: none;
+      border-radius: 10px;
+      color: white;
+      font-size: 1rem;
+      font-weight: 600;
+      font-family: inherit;
+      cursor: pointer;
+      transition: opacity 0.15s, transform 0.1s;
+    }
+    .form button:hover { opacity: 0.9; transform: translateY(-1px); }
+    .form button:active { transform: translateY(0); }
+
+    .fine {
+      font-size: 0.8rem;
+      color: rgba(255,255,255,0.25);
+      margin-bottom: 2.5rem;
+    }
+
+    /* Features */
+    .features {
+      display: flex;
+      flex-direction: column;
+      gap: 0.75rem;
+      text-align: left;
+      margin-bottom: 2.5rem;
+    }
+    .feature {
+      display: flex;
+      align-items: flex-start;
+      gap: 10px;
+    }
+    .feature-dot {
+      width: 5px;
+      height: 5px;
+      border-radius: 50%;
+      background: linear-gradient(135deg, #818cf8, #c084fc);
+      flex-shrink: 0;
+      margin-top: 8px;
+    }
+    .feature-text {
+      font-size: 0.9rem;
+      color: rgba(255,255,255,0.65);
+      line-height: 1.5;
+    }
+    .feature-text strong { color: #fff; font-weight: 600; }
+
+    .success-msg {
+      display: none;
+      padding: 1rem;
+      background: rgba(167,139,250,0.1);
+      border: 1px solid rgba(167,139,250,0.2);
+      border-radius: 10px;
+      color: #a78bfa;
+      font-size: 0.9rem;
+      margin-bottom: 1rem;
+    }
+
+    footer {
+      margin-top: auto;
+      padding-top: 2rem;
+      font-size: 0.75rem;
+      color: rgba(255,255,255,0.2);
+    }
+  </style>
+</head>
+<body>
+  <div class="card">
+
+    <div class="logo">
+      <div class="logo-k">
+        <svg viewBox="0 0 20 20" fill="none" xmlns="http://www.w3.org/2000/svg">
+          <path d="M5 3.5V16.5M5 10.5L14.5 3.5M5 10.5L14.5 16.5" stroke="white" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/>
+        </svg>
+      </div>
+      <span class="logo-name">PostKraft</span>
+    </div>
+
+    <div class="badge">
+      <div class="badge-dot"></div>
+      Conference Exclusive
+    </div>
+
+    <h1>Your first month<br>is <span class="gradient">on us.</span></h1>
+
+    <p class="sub">
+      Drop your listing photos into PostKraft. AI writes platform-optimized captions for Instagram, Facebook, LinkedIn, and X — then posts on your schedule.
+    </p>
+
+    <div class="offer">
+      <div class="offer-label">Exclusive offer — conference attendees</div>
+      <div class="offer-value">30 days free.</div>
+      <div class="offer-desc">No credit card required. Cancel anytime after.</div>
+    </div>
+
+    <div class="form">
+      <input type="email" id="email-input" placeholder="your@email.com" />
+      <button onclick="handleSignup()">Claim My Free Month</button>
+    </div>
+    <div class="success-msg" id="success-msg">
+      You're in. We'll reach out with early access and your free month. Welcome to PostKraft.
+    </div>
+    <p class="fine">$79/month after trial · Cancel anytime · No contracts</p>
+
+    <div class="features">
+      <div class="feature">
+        <div class="feature-dot"></div>
+        <div class="feature-text"><strong>AI reads your photos</strong> — captions written automatically, no prompting required</div>
+      </div>
+      <div class="feature">
+        <div class="feature-dot"></div>
+        <div class="feature-text"><strong>One workflow, four platforms</strong> — Instagram, Facebook, LinkedIn, and X simultaneously</div>
+      </div>
+      <div class="feature">
+        <div class="feature-dot"></div>
+        <div class="feature-text"><strong>Schedule everything</strong> — posts go out on time, even when you're showing homes</div>
+      </div>
+    </div>
+
+  </div>
+
+  <footer>PostKraft · postkraft.app · Built on Nantucket Island</footer>
+
+  <script>
+    const API = 'https://postkraft-api-production.up.railway.app';
+
+    async function handleSignup() {
+      const email = document.getElementById('email-input').value.trim();
+      if (!email || !email.includes('@')) {
+        document.getElementById('email-input').focus();
+        return;
+      }
+      const btn = document.querySelector('button');
+      btn.textContent = 'Saving...';
+      btn.disabled = true;
+      try {
+        const res = await fetch(`${API}/waitlist`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ email, source: 'conference_2026' }),
+        });
+        if (!res.ok) throw new Error();
+        document.querySelector('.form').style.display = 'none';
+        document.getElementById('success-msg').style.display = 'block';
+      } catch {
+        btn.textContent = 'Claim My Free Month';
+        btn.disabled = false;
+        alert('Something went wrong — email us at hello@postkraft.com');
+      }
+    }
+
+    document.getElementById('email-input').addEventListener('keydown', e => {
+      if (e.key === 'Enter') handleSignup();
+    });
+  </script>
+</body>
+</html>
