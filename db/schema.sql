@@ -47,6 +47,17 @@ CREATE TABLE IF NOT EXISTS oauth_tokens (
   UNIQUE(user_id, platform)
 );
 
+-- ─── Waitlist (public — landing page signups) ────────────────────────────────
+CREATE TABLE IF NOT EXISTS waitlist (
+  id         UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  email      TEXT NOT NULL,
+  source     TEXT NOT NULL DEFAULT 'real_estate',
+    -- real_estate | restaurant | retail
+  notified   BOOLEAN NOT NULL DEFAULT FALSE,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  UNIQUE(email, source)
+);
+
 -- ─── Scheduled posts (server-side, fires even when Mac is off) ───────────────
 CREATE TABLE IF NOT EXISTS scheduled_posts (
   id              UUID PRIMARY KEY DEFAULT gen_random_uuid(),
