@@ -2,6 +2,7 @@ const express = require("express");
 const bcrypt = require("bcrypt");
 const crypto = require("crypto");
 const db = require("../db");
+const stripe = require("../lib/stripe");
 const { signToken } = require("../lib/jwt");
 const requireAuth = require("../middleware/requireAuth");
 
@@ -10,7 +11,13 @@ const SALT_ROUNDS = 12;
 
 // ─── POST /auth/register ─────────────────────────────────────────────────────
 // Body: { email, password, full_name? }
-// Returns: { token, user }
+// Returns: { token, user, linkedExistingSubscription? }
+//
+// If a Stripe customer already exists for this email (e.g. Sean manually
+// created the customer + trial subscription during conference activation),
+// the new user row is auto-linked to that customer + subscription on register.
+// This lets concierge-activated agents register themselves in the app and
+// immediately see their trial active — no manual user-row creation needed.
 router.post("/register", async (req, res, next) => {
   try {
     const { email, password, full_name } = req.body;
@@ -22,27 +29,95 @@ router.post("/register", async (req, res, next) => {
       return res.status(400).json({ error: "Password must be at least 8 characters" });
     }
 
+    const cleanEmail = email.toLowerCase().trim();
+
     // Check for existing account
-    const existing = await db.query("SELECT id FROM users WHERE email = $1", [
-      email.toLowerCase().trim(),
-    ]);
+    const existing = await db.query("SELECT id FROM users WHERE email = $1", [cleanEmail]);
     if (existing.rows.length) {
       return res.status(409).json({ error: "An account with that email already exists" });
     }
 
     const password_hash = await bcrypt.hash(password, SALT_ROUNDS);
 
+    // Look up any pre-existing Stripe customer (concierge activation flow).
+    // We prefer the *most recently created* customer in case of duplicates.
+    let stripeLink = null;
+    try {
+      const customers = await stripe.customers.list({ email: cleanEmail, limit: 5 });
+      if (customers.data.length > 0) {
+        // Sort by created desc; Stripe returns in that order already, but be explicit.
+        const customer = customers.data.sort((a, b) => b.created - a.created)[0];
+
+        // Pull their most recent subscription (any status — we want trialing, active, past_due, etc.).
+        const subs = await stripe.subscriptions.list({
+          customer: customer.id,
+          status: "all",
+          limit: 1,
+        });
+        const sub = subs.data[0] || null;
+
+        stripeLink = {
+          stripe_customer_id: customer.id,
+          subscription_id: sub?.id || null,
+          subscription_status: sub?.status || "inactive",
+          trial_ends_at: sub?.trial_end ? new Date(sub.trial_end * 1000) : null,
+          current_period_end: sub?.current_period_end
+            ? new Date(sub.current_period_end * 1000)
+            : null,
+        };
+        console.log(
+          `🔗 Linking new user ${cleanEmail} to existing Stripe customer ${customer.id} ` +
+            `(sub: ${sub?.id || "none"}, status: ${sub?.status || "n/a"})`
+        );
+      }
+    } catch (err) {
+      // Don't block registration if Stripe lookup fails — log and continue.
+      // The user can subscribe normally via /billing/subscribe after registering.
+      console.error("[auth/register] Stripe lookup failed:", err.message);
+    }
+
     const { rows } = await db.query(
-      `INSERT INTO users (email, password_hash, full_name)
-       VALUES ($1, $2, $3)
-       RETURNING id, email, full_name, subscription_status, created_at`,
-      [email.toLowerCase().trim(), password_hash, full_name || null]
+      `INSERT INTO users (
+         email, password_hash, full_name,
+         stripe_customer_id, subscription_id, subscription_status,
+         trial_ends_at, current_period_end
+       )
+       VALUES ($1, $2, $3, $4, $5, COALESCE($6, 'inactive'), $7, $8)
+       RETURNING id, email, full_name, subscription_status, trial_ends_at,
+                 current_period_end, created_at`,
+      [
+        cleanEmail,
+        password_hash,
+        full_name || null,
+        stripeLink?.stripe_customer_id || null,
+        stripeLink?.subscription_id || null,
+        stripeLink?.subscription_status || null,
+        stripeLink?.trial_ends_at || null,
+        stripeLink?.current_period_end || null,
+      ]
     );
+
+    // If we linked a Stripe customer, write the user_id back into Stripe metadata
+    // so future webhook events (which look up by customer or subscription) can
+    // resolve the postkraft_user_id without an email round-trip.
+    if (stripeLink?.stripe_customer_id) {
+      try {
+        await stripe.customers.update(stripeLink.stripe_customer_id, {
+          metadata: { postkraft_user_id: rows[0].id },
+        });
+      } catch (err) {
+        console.error("[auth/register] Stripe metadata update failed:", err.message);
+      }
+    }
 
     const user = rows[0];
     const token = signToken(user);
 
-    res.status(201).json({ token, user: sanitize(user) });
+    res.status(201).json({
+      token,
+      user: sanitize(user),
+      linkedExistingSubscription: Boolean(stripeLink?.subscription_id),
+    });
   } catch (err) {
     next(err);
   }
