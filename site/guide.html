@@ -1,0 +1,522 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>How to Use PostKraft — Getting Started Guide</title>
+  <meta name="description" content="Everything you need to set up PostKraft and post your first listing in under 5 minutes." />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&display=swap" rel="stylesheet" />
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    :root {
+      --bg:        #07070f;
+      --bg2:       #0d0d1a;
+      --bg3:       #12121f;
+      --border:    rgba(255,255,255,0.07);
+      --violet:    #7c3aed;
+      --violet2:   #6d28d9;
+      --fuchsia:   #a855f7;
+      --blue:      #3b82f6;
+      --text:      #f1f0ff;
+      --muted:     rgba(255,255,255,0.55);
+      --subtle:    rgba(255,255,255,0.15);
+    }
+
+    html { scroll-behavior: smooth; }
+
+    body {
+      font-family: 'Inter', -apple-system, sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      line-height: 1.7;
+      -webkit-font-smoothing: antialiased;
+    }
+
+    a { color: #c4b5fd; text-decoration: none; transition: opacity 0.15s; }
+    a:hover { opacity: 0.8; }
+
+    /* ── NAV ─────────────────────────────────── */
+    nav {
+      position: fixed; top: 0; left: 0; right: 0; z-index: 100;
+      display: flex; align-items: center; justify-content: space-between;
+      padding: 0 2rem;
+      height: 64px;
+      background: rgba(7,7,15,0.85);
+      backdrop-filter: blur(16px);
+      border-bottom: 1px solid var(--border);
+    }
+    .nav-logo {
+      display: flex; align-items: center; gap: 10px;
+      font-weight: 700; font-size: 1.1rem; letter-spacing: -0.02em;
+      text-decoration: none; color: var(--text);
+    }
+    .nav-logo-k {
+      width: 32px; height: 32px; border-radius: 8px;
+      background: linear-gradient(135deg, #4da8f8, #7c2be8);
+      display: flex; align-items: center; justify-content: center;
+      font-weight: 900; font-size: 1rem; color: white;
+      box-shadow: 0 0 16px rgba(124,42,232,0.4);
+    }
+    .nav-right {
+      display: flex; align-items: center; gap: 1.5rem;
+    }
+    .nav-right a { color: var(--muted); font-size: 0.9rem; font-weight: 500; }
+    .nav-right a:hover { color: var(--text); opacity: 1; }
+    .nav-cta {
+      background: linear-gradient(135deg, var(--violet), var(--fuchsia));
+      color: white !important; border: none; border-radius: 10px;
+      padding: 0.5rem 1.25rem; font-size: 0.875rem; font-weight: 600;
+      cursor: pointer; text-decoration: none;
+    }
+
+    /* ── HEADER ──────────────────────────────── */
+    .header {
+      padding: 140px 1.5rem 60px;
+      text-align: center;
+      position: relative; overflow: hidden;
+    }
+    .header-glow {
+      position: absolute; top: 30%; left: 50%; transform: translateX(-50%);
+      width: 700px; height: 400px; border-radius: 50%;
+      background: radial-gradient(ellipse, rgba(124,42,232,0.18) 0%, transparent 70%);
+      pointer-events: none;
+    }
+    .badge {
+      display: inline-flex; align-items: center; gap: 6px;
+      background: rgba(124,42,232,0.12); border: 1px solid rgba(124,42,232,0.25);
+      border-radius: 100px; padding: 0.35rem 1rem;
+      font-size: 0.75rem; font-weight: 600; color: #c4b5fd;
+      letter-spacing: 0.04em; text-transform: uppercase;
+      margin-bottom: 1.5rem;
+      position: relative; z-index: 1;
+    }
+    h1 {
+      font-size: clamp(2.25rem, 5vw, 3.75rem);
+      font-weight: 900;
+      letter-spacing: -0.03em;
+      line-height: 1.1;
+      max-width: 720px;
+      margin: 0 auto 1.25rem;
+      position: relative; z-index: 1;
+    }
+    h1 .gradient {
+      background: linear-gradient(135deg, #818cf8, #a855f7, #ec4899);
+      -webkit-background-clip: text; -webkit-text-fill-color: transparent;
+      background-clip: text;
+    }
+    .header-sub {
+      font-size: clamp(1rem, 1.75vw, 1.15rem);
+      color: var(--muted);
+      max-width: 580px;
+      margin: 0 auto;
+      position: relative; z-index: 1;
+    }
+
+    /* ── TABLE OF CONTENTS ─────────────────── */
+    .toc-wrap {
+      max-width: 1100px; margin: 0 auto;
+      padding: 0 1.5rem 60px;
+    }
+    .toc {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+      gap: 0.75rem;
+      background: var(--bg2);
+      border: 1px solid var(--border);
+      border-radius: 16px;
+      padding: 1.5rem;
+    }
+    .toc a {
+      display: flex; align-items: center; gap: 0.65rem;
+      padding: 0.5rem 0.75rem;
+      border-radius: 8px;
+      color: var(--text);
+      font-size: 0.9rem; font-weight: 500;
+      transition: background 0.15s;
+    }
+    .toc a:hover { background: rgba(124,42,232,0.1); opacity: 1; }
+    .toc-num {
+      width: 24px; height: 24px; border-radius: 6px;
+      background: rgba(124,42,232,0.15);
+      color: #c4b5fd;
+      display: flex; align-items: center; justify-content: center;
+      font-size: 0.75rem; font-weight: 700;
+      flex-shrink: 0;
+    }
+
+    /* ── CONTENT ──────────────────────────── */
+    main {
+      max-width: 760px; margin: 0 auto;
+      padding: 0 1.5rem 100px;
+    }
+    section {
+      padding: 60px 0;
+      border-bottom: 1px solid var(--border);
+    }
+    section:last-of-type { border-bottom: none; }
+    h2 {
+      font-size: clamp(1.5rem, 3vw, 2rem);
+      font-weight: 800;
+      letter-spacing: -0.02em;
+      line-height: 1.2;
+      margin-bottom: 0.5rem;
+      display: flex; align-items: center; gap: 0.75rem;
+    }
+    .step-num {
+      width: 36px; height: 36px; border-radius: 10px;
+      background: linear-gradient(135deg, var(--violet), var(--fuchsia));
+      display: flex; align-items: center; justify-content: center;
+      font-size: 1rem; font-weight: 800;
+      color: white;
+      flex-shrink: 0;
+      box-shadow: 0 4px 16px rgba(124,42,232,0.35);
+    }
+    h2 + .lede {
+      color: var(--muted);
+      font-size: 1.05rem;
+      margin-bottom: 1.5rem;
+      margin-left: calc(36px + 0.75rem);
+    }
+    section h3 {
+      font-size: 1.1rem; font-weight: 700;
+      letter-spacing: -0.01em;
+      margin-top: 2rem; margin-bottom: 0.5rem;
+      color: var(--text);
+    }
+    section p { color: rgba(255,255,255,0.75); margin-bottom: 1rem; }
+    section ol, section ul {
+      color: rgba(255,255,255,0.75);
+      padding-left: 1.5rem;
+      margin-bottom: 1rem;
+    }
+    section li { margin-bottom: 0.5rem; }
+    section li strong { color: var(--text); font-weight: 600; }
+    section strong { color: var(--text); font-weight: 600; }
+
+    .callout {
+      background: var(--bg2);
+      border: 1px solid var(--border);
+      border-left: 3px solid var(--violet);
+      border-radius: 10px;
+      padding: 1rem 1.25rem;
+      margin: 1.25rem 0;
+      color: rgba(255,255,255,0.8);
+      font-size: 0.95rem;
+    }
+    .callout strong { color: #c4b5fd; }
+
+    code, kbd {
+      background: rgba(124,42,232,0.15);
+      color: #c4b5fd;
+      padding: 0.15rem 0.4rem;
+      border-radius: 5px;
+      font-family: 'SF Mono', 'Menlo', monospace;
+      font-size: 0.85em;
+    }
+
+    /* ── QUICK START PANEL ──────────────────── */
+    .quick-start {
+      background: linear-gradient(135deg, rgba(124,42,232,0.12), rgba(168,85,247,0.06));
+      border: 1px solid rgba(124,42,232,0.3);
+      border-radius: 18px;
+      padding: 2rem;
+      margin: 0 auto 30px;
+      max-width: 760px;
+    }
+    .quick-start-label {
+      display: inline-flex; align-items: center; gap: 0.4rem;
+      background: rgba(124,42,232,0.2);
+      color: #c4b5fd;
+      font-size: 0.75rem; font-weight: 700;
+      letter-spacing: 0.05em; text-transform: uppercase;
+      padding: 0.25rem 0.75rem; border-radius: 100px;
+      margin-bottom: 1rem;
+    }
+    .quick-start h3 {
+      font-size: 1.5rem; font-weight: 800;
+      margin-bottom: 0.5rem; letter-spacing: -0.02em;
+    }
+    .quick-start p {
+      color: rgba(255,255,255,0.75);
+      font-size: 0.95rem;
+    }
+    .quick-start ol {
+      color: rgba(255,255,255,0.85);
+      padding-left: 1.5rem;
+      margin-top: 1rem;
+    }
+
+    /* ── FOOTER ─────────────────────────────── */
+    footer {
+      border-top: 1px solid var(--border);
+      padding: 3rem 1.5rem 2rem;
+      text-align: center;
+      background: var(--bg2);
+    }
+    footer p { color: var(--muted); font-size: 0.875rem; margin-bottom: 0.5rem; }
+    footer a { color: #c4b5fd; }
+
+    @media (max-width: 600px) {
+      nav { padding: 0 1rem; }
+      .nav-right { gap: 1rem; }
+      .nav-right a:not(.nav-cta) { display: none; }
+      .header { padding: 120px 1rem 40px; }
+      h2 { font-size: 1.5rem; }
+      h2 + .lede { margin-left: 0; }
+      .quick-start { padding: 1.5rem; }
+    }
+  </style>
+</head>
+
+<body>
+
+<nav>
+  <a href="/" class="nav-logo">
+    <span class="nav-logo-k">K</span>
+    PostKraft
+  </a>
+  <div class="nav-right">
+    <a href="/">Home</a>
+    <a href="mailto:sean@postkraft.app">Support</a>
+    <a href="/download" class="nav-cta">Download</a>
+  </div>
+</nav>
+
+<header class="header">
+  <div class="header-glow"></div>
+  <div class="badge">
+    <span>Getting Started</span>
+  </div>
+  <h1>How to use <span class="gradient">PostKraft</span></h1>
+  <p class="header-sub">From install to your first published post — about five minutes, start to finish.</p>
+</header>
+
+<div class="toc-wrap">
+  <nav class="toc" aria-label="Guide sections">
+    <a href="#install"><span class="toc-num">1</span>Install &amp; sign in</a>
+    <a href="#brand"><span class="toc-num">2</span>Set up your brand</a>
+    <a href="#connect"><span class="toc-num">3</span>Connect socials</a>
+    <a href="#memory"><span class="toc-num">4</span>Memory Bank</a>
+    <a href="#first-post"><span class="toc-num">5</span>Your first post</a>
+    <a href="#schedule"><span class="toc-num">6</span>Schedule &amp; publish</a>
+    <a href="#autopilot"><span class="toc-num">7</span>Autopilot</a>
+    <a href="#billing"><span class="toc-num">8</span>Billing</a>
+    <a href="#help"><span class="toc-num">?</span>Troubleshooting</a>
+  </nav>
+</div>
+
+<main>
+
+  <div class="quick-start">
+    <div class="quick-start-label">⚡ Quick start</div>
+    <h3>Five minutes to your first post</h3>
+    <p>If you only read one thing on this page, read this. Everything below is detail.</p>
+    <ol>
+      <li><strong>Install</strong> the DMG from <a href="/download">postkraft.app/download</a> and drag PostKraft to your Applications folder.</li>
+      <li><strong>Sign up</strong> in the app with your email. Enter promo code <code>CONFERENCE26</code> at checkout for your free month.</li>
+      <li><strong>Connect Instagram, Facebook, and LinkedIn</strong> in the onboarding wizard — three clicks each.</li>
+      <li><strong>Drop a listing photo</strong> into the Studio tab. PostKraft writes the caption, picks the format, and queues a post for each platform.</li>
+      <li><strong>Review and post.</strong> Tap publish or schedule for later. That's it.</li>
+    </ol>
+  </div>
+
+  <section id="install">
+    <h2><span class="step-num">1</span>Install &amp; sign in</h2>
+    <p class="lede">Get the app on your Mac and create your account.</p>
+
+    <h3>Download and install</h3>
+    <ol>
+      <li>Go to <a href="/download">postkraft.app/download</a> on your Mac. The DMG will start downloading automatically.</li>
+      <li>Open the downloaded <code>PostKraft-1.0.1-arm64.dmg</code> file.</li>
+      <li>Drag the PostKraft icon to your Applications folder.</li>
+      <li>Open PostKraft from Applications (or use Spotlight: <kbd>⌘ Space</kbd> then type "PostKraft").</li>
+    </ol>
+
+    <div class="callout">
+      <strong>System requirements:</strong> Apple Silicon Mac (M1, M2, M3, or M4) running macOS 12 or later. A universal binary for Intel Macs is coming soon.
+    </div>
+
+    <h3>Create your account</h3>
+    <ol>
+      <li>The first time you open PostKraft, you'll see a sign-up screen.</li>
+      <li>Enter your email address and create a password.</li>
+      <li>You'll be taken to Stripe checkout — enter promo code <strong>CONFERENCE26</strong> for your free 30-day trial.</li>
+      <li>Add your payment method. You won't be charged until day 31, and you'll lock in the $49/month founding rate forever.</li>
+    </ol>
+  </section>
+
+  <section id="brand">
+    <h2><span class="step-num">2</span>Set up your brand</h2>
+    <p class="lede">A two-minute setup that makes every caption sound like you.</p>
+
+    <p>After sign-up, the onboarding wizard asks for a few essentials. The more you give it now, the better your first captions will be.</p>
+
+    <ul>
+      <li><strong>Company name:</strong> Your brokerage or personal brand (e.g., "Whitney Group NE").</li>
+      <li><strong>Industry:</strong> Real Estate.</li>
+      <li><strong>Bio:</strong> Two or three sentences about who you are and who you help. This becomes the foundation of every caption.</li>
+      <li><strong>Brand voice:</strong> Pick the tone that fits how you actually communicate — friendly &amp; approachable, professional &amp; authoritative, bold &amp; disruptive, etc.</li>
+    </ul>
+
+    <div class="callout">
+      <strong>You can edit this anytime</strong> from the <em>Profile</em> tab in the sidebar. Most people refine their brand voice after seeing a few posts come out.
+    </div>
+  </section>
+
+  <section id="connect">
+    <h2><span class="step-num">3</span>Connect your social accounts</h2>
+    <p class="lede">Instagram, Facebook, and LinkedIn — three logins, three clicks each.</p>
+
+    <h3>Instagram + Facebook</h3>
+    <ol>
+      <li>Click <strong>Connect Meta</strong> in the onboarding wizard (or later in the <em>Accounts</em> tab).</li>
+      <li>A browser window opens — log in with the Facebook account that manages your business pages.</li>
+      <li>Select your Facebook Page and the connected Instagram Business account.</li>
+      <li>Approve the permissions PostKraft needs to publish posts.</li>
+      <li>You'll be returned to the app. You should see green check marks next to both.</li>
+    </ol>
+
+    <div class="callout">
+      <strong>Heads up:</strong> Instagram only allows third-party posting from Business or Creator accounts that are linked to a Facebook Page. If yours is set to Personal, switch it in the Instagram app first: <em>Settings → Account → Switch to Professional Account</em>.
+    </div>
+
+    <h3>LinkedIn</h3>
+    <ol>
+      <li>Click <strong>Connect LinkedIn</strong>.</li>
+      <li>Sign in with the account you post from.</li>
+      <li>Approve the permissions and you're done.</li>
+    </ol>
+
+    <p>PostKraft posts to your personal LinkedIn profile by default. Posting to LinkedIn Company Pages is on the roadmap.</p>
+  </section>
+
+  <section id="memory">
+    <h2><span class="step-num">4</span>Fill in the Memory Bank</h2>
+    <p class="lede">The single most important step. This is what makes PostKraft sound like you and not like every other AI.</p>
+
+    <p>The Memory Bank is a place to dump everything you know about your market, your neighborhood, and your favorite spots. PostKraft pulls from it every time it writes a caption. The richer it is, the more your posts read like they came from a local expert — because they did.</p>
+
+    <h3>Three categories to start</h3>
+    <ul>
+      <li><strong>Real Estate Market:</strong> Price tiers, days on market, what's selling, what's not, regulatory quirks (septic, flood zones, HOAs), local pitfalls buyers always miss.</li>
+      <li><strong>Local Lifestyle:</strong> Your neighborhoods explained the way a local would. The light, the seasons, the community, what makes living here different.</li>
+      <li><strong>Things To Do:</strong> Your actual go-to restaurants, the beach you send people to, the museum that's worth two hours, the bike route worth doing.</li>
+    </ul>
+
+    <h3>How to write it</h3>
+    <p>Write like you're texting a friend who just moved to town. Specific. Personal. No marketing language. PostKraft will polish the tone for each platform — your job is to give it real substance.</p>
+
+    <div class="callout">
+      <strong>Pro tip:</strong> Spend 20 minutes on this before your first post. You can keep adding to it forever, but those first 20 minutes are worth more than any other setup time.
+    </div>
+
+    <h3>Voice rules</h3>
+    <p>At the bottom of each Memory Bank section, add a line about words to avoid and signature phrases you always use. PostKraft will follow these on every post.</p>
+    <p>Example: <em>"Never say stunning, breathtaking, or luxury living. Always describe the property in concrete terms — square footage, bedrooms, what the kitchen actually looks like."</em></p>
+  </section>
+
+  <section id="first-post">
+    <h2><span class="step-num">5</span>Create your first post</h2>
+    <p class="lede">Drop a photo. Get three drafts. Approve. Done.</p>
+
+    <ol>
+      <li>Open the <strong>Studio</strong> tab in the sidebar.</li>
+      <li>Drag a listing photo (or several) into the upload area. JPG and PNG both work.</li>
+      <li>Pick a theme: <em>Market</em>, <em>Local Lifestyle</em>, or <em>Things To Do</em>. This tells PostKraft what kind of post you want.</li>
+      <li>Choose a tone — Conversational, Professional, Playful, Storytelling, or Educational.</li>
+      <li>Click <strong>Generate</strong>. In about 10 seconds you'll see drafts for each connected platform: Instagram, Facebook, LinkedIn.</li>
+    </ol>
+
+    <h3>What you get back</h3>
+    <p>Each platform gets a draft formatted for its norms — Instagram leans visual and tight, LinkedIn goes longer and more professional, Facebook lands in the middle. PostKraft also suggests hashtags and a call-to-action.</p>
+
+    <div class="callout">
+      <strong>Captions feel off?</strong> Click <em>Regenerate</em> for new variations, or edit directly in the preview. Every edit you make trains PostKraft on what you actually want.
+    </div>
+  </section>
+
+  <section id="schedule">
+    <h2><span class="step-num">6</span>Schedule, edit, or publish</h2>
+    <p class="lede">Post now, queue for later, or save as a draft.</p>
+
+    <h3>Post immediately</h3>
+    <p>Click <strong>Publish Now</strong> on any draft and PostKraft sends it to the platform. Should land within a few seconds.</p>
+
+    <h3>Schedule for later</h3>
+    <ol>
+      <li>Click the calendar icon on any draft.</li>
+      <li>Pick a date and time. PostKraft will publish it automatically at that moment.</li>
+      <li>View and manage scheduled posts in the <strong>Calendar</strong> tab.</li>
+    </ol>
+
+    <h3>Save as draft</h3>
+    <p>Not ready to post? Click <strong>Save</strong>. It moves to the <strong>Library</strong> tab where you can come back and edit, schedule, or delete it later.</p>
+  </section>
+
+  <section id="autopilot">
+    <h2><span class="step-num">7</span>Autopilot (optional, powerful)</h2>
+    <p class="lede">Point PostKraft at a folder. Whenever you drop new listing photos in, drafts appear automatically.</p>
+
+    <ol>
+      <li>Open the <strong>Autopilot</strong> tab.</li>
+      <li>Click <strong>Choose Folder</strong> and pick the folder where you save listing photos (e.g., <code>~/Pictures/Listings/</code>).</li>
+      <li>Set your weekly cadence per platform — for example, 3 Instagram, 2 Facebook, 2 LinkedIn posts per week.</li>
+      <li>Toggle Autopilot on.</li>
+    </ol>
+
+    <p>From there, every photo you drop in becomes a draft waiting for your approval. You stay in control of what publishes — Autopilot just removes the manual upload step.</p>
+  </section>
+
+  <section id="billing">
+    <h2><span class="step-num">8</span>Manage your billing</h2>
+    <p class="lede">Update payment methods, view invoices, cancel anytime.</p>
+
+    <ol>
+      <li>Open the <strong>Billing</strong> tab in the app.</li>
+      <li>Click <strong>Manage Subscription</strong>.</li>
+      <li>You'll be taken to the Stripe Customer Portal where you can update your card, download invoices, or cancel.</li>
+    </ol>
+
+    <div class="callout">
+      <strong>Founding member pricing:</strong> If you signed up with CONFERENCE26, your $49/month rate is locked in for life. Even when standard pricing moves to $79, you stay at $49.
+    </div>
+  </section>
+
+  <section id="help">
+    <h2><span class="step-num">?</span>Troubleshooting &amp; common questions</h2>
+    <p class="lede">The handful of issues that come up most often.</p>
+
+    <h3>"My Instagram won't connect."</h3>
+    <p>The Instagram account must be a Business or Creator account linked to a Facebook Page. Personal Instagram accounts can't post through any third-party tool — that's a Meta restriction. To switch: open the Instagram app on your phone → Settings → Account → Switch to Professional Account.</p>
+
+    <h3>"The captions don't sound like me."</h3>
+    <p>Fill in the Memory Bank with more detail and add Voice Rules at the bottom of each section. Then regenerate. PostKraft adapts to whatever you write in the Memory Bank, so the more specific you get, the more it sounds like you.</p>
+
+    <h3>"A scheduled post didn't go out."</h3>
+    <p>PostKraft needs to be running on your Mac to publish scheduled posts. If your Mac was asleep or the app was closed, the post will be marked as Failed in the Calendar tab. Click it to retry. Auto-publishing in the cloud (so your Mac doesn't need to be on) is on the roadmap.</p>
+
+    <h3>"Can I post to TikTok / Pinterest / Twitter?"</h3>
+    <p>Twitter/X is rolling out now. TikTok and Pinterest are coming in Phase 2. The full multi-platform support is the long-term direction.</p>
+
+    <h3>"Can I post to multiple LinkedIn or Instagram accounts?"</h3>
+    <p>Not yet — PostKraft is currently single-account per platform. Multi-account support is on the roadmap.</p>
+
+    <h3>"How do I cancel?"</h3>
+    <p>Billing tab → Manage Subscription → Cancel. You'll keep access through the end of your current billing period.</p>
+
+    <h3>Still stuck?</h3>
+    <p>Email <a href="mailto:sean@postkraft.app">sean@postkraft.app</a> and you'll hear back from Sean directly, usually within a few hours. Founding members get priority support — that's part of the deal.</p>
+  </section>
+
+</main>
+
+<footer>
+  <p>Built by <a href="https://thekalmanco.com">The Kalman Co.</a> on Nantucket Island.</p>
+  <p>Questions, ideas, or feedback → <a href="mailto:sean@postkraft.app">sean@postkraft.app</a></p>
+</footer>
+
+</body>
+</html>
