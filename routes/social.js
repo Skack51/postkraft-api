@@ -123,7 +123,7 @@ router.post("/upload-image", async (req, res, next) => {
 // ══════════════════════════════════════════════════════════════════════════════
 router.post("/post", async (req, res, next) => {
   try {
-    const { platform, caption, hashtags, cta, imageBase64 } = req.body;
+    const { platform, caption, hashtags, cta, imageBase64, boardId, title, link } = req.body;
 
     if (!platform || !caption) {
       return res.status(400).json({ error: "platform and caption are required" });
@@ -140,6 +140,10 @@ router.post("/post", async (req, res, next) => {
         return res.json(await postToLinkedIn(req.user.id, fullText, imageBase64));
       case "twitter":
         return res.json(await postToTwitter(req.user.id, fullText, imageBase64));
+      case "pinterest":
+        if (!imageBase64) return res.status(400).json({ error: "Pinterest requires an image" });
+        if (!boardId) return res.status(400).json({ error: "Pinterest requires a boardId" });
+        return res.json(await postToPinterest(req.user.id, fullText, imageBase64, boardId, title, link));
       default:
         return res.status(400).json({ error: `Unsupported platform: ${platform}` });
     }
@@ -374,6 +378,56 @@ async function postToLinkedIn(userId, text, imageBase64) {
     if (post.message) throw new Error(post.message);
     return { success: true, postId: post.id, platform: "linkedin" };
   }
+}
+
+// ══════════════════════════════════════════════════════════════════════════════
+//  PINTEREST
+//  Creates a Pin on a user-selected board. Requires an image (Pinterest does
+//  not allow text-only Pins). The image is uploaded to Cloudinary first to
+//  get a public URL, then handed to Pinterest's v5 API as media_source.
+// ══════════════════════════════════════════════════════════════════════════════
+async function postToPinterest(userId, text, imageBase64, boardId, title, link) {
+  const token = await getToken(userId, "pinterest");
+
+  // Pinterest requires a public image URL — host it on Cloudinary first
+  const imageUrl = await uploadImageToCloudinary(imageBase64);
+
+  // Pinterest Pin description has a 500-char limit
+  const description = text.length > 500 ? text.substring(0, 497) + "..." : text;
+
+  // Title is optional but recommended (100-char limit). If not provided,
+  // derive it from the first line of the caption.
+  const pinTitle = (title || text.split("\n")[0]).substring(0, 100);
+
+  const body = {
+    board_id: boardId,
+    title: pinTitle,
+    description,
+    media_source: {
+      source_type: "image_url",
+      url: imageUrl,
+    },
+  };
+
+  // Optional destination link (e.g., back to the listing on thekalmanco.com)
+  if (link) body.link = link;
+
+  const postRes = await fetch("https://api.pinterest.com/v5/pins", {
+    method: "POST",
+    headers: {
+      Authorization: `Bearer ${token.access_token}`,
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify(body),
+  });
+
+  if (!postRes.ok) {
+    const errText = await postRes.text();
+    throw new Error(`Pinterest API error ${postRes.status}: ${errText}`);
+  }
+
+  const pin = await postRes.json();
+  return { success: true, postId: pin.id, platform: "pinterest" };
 }
 
 module.exports = router;

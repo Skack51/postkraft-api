@@ -508,6 +508,44 @@ router.delete("/twitter/disconnect", async (req, res, next) => {
 
 const PINTEREST_SCOPES = "boards:read,pins:write,user_accounts:read";
 
+// GET /oauth/pinterest/boards
+// Returns the user's Pinterest boards. Used by Studio to populate the
+// board picker dropdown when creating a Pin.
+router.get("/pinterest/boards", async (req, res, next) => {
+  try {
+    const { rows } = await db.query(
+      `SELECT access_token FROM oauth_tokens
+       WHERE user_id = $1 AND platform = 'pinterest'`,
+      [req.user.id]
+    );
+    if (!rows.length) return res.status(404).json({ error: "Pinterest not connected" });
+
+    const boardsRes = await fetch(
+      "https://api.pinterest.com/v5/boards?page_size=100",
+      { headers: { Authorization: `Bearer ${rows[0].access_token}` } }
+    );
+
+    if (!boardsRes.ok) {
+      const errText = await boardsRes.text();
+      throw new Error(`Pinterest boards fetch failed (${boardsRes.status}): ${errText}`);
+    }
+
+    const data = await boardsRes.json();
+    // Pinterest returns { items: [{id, name, ...}], bookmark }
+    // Surface just what the frontend needs
+    res.json({
+      boards: (data.items || []).map((b) => ({
+        id: b.id,
+        name: b.name,
+        privacy: b.privacy,
+        pinCount: b.pin_count,
+      })),
+    });
+  } catch (err) {
+    next(err);
+  }
+});
+
 // DELETE /oauth/pinterest/disconnect
 router.delete("/pinterest/disconnect", async (req, res, next) => {
   try {
