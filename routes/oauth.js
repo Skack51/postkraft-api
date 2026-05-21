@@ -112,7 +112,7 @@ router.get("/pinterest/url", requireAuth, (req, res) => {
   url.searchParams.set("client_id", process.env.PINTEREST_APP_ID);
   url.searchParams.set("redirect_uri", process.env.PINTEREST_REDIRECT_URI);
   url.searchParams.set("response_type", "code");
-  url.searchParams.set("scope", "boards:read,pins:write,user_accounts:read");
+  url.searchParams.set("scope", "boards:read,boards:write,pins:read,pins:write,user_accounts:read");
   url.searchParams.set("state", state);
   res.json({ url: url.toString() });
 });
@@ -506,7 +506,7 @@ router.delete("/twitter/disconnect", async (req, res, next) => {
 //  PINTEREST
 // ══════════════════════════════════════════════════════════════════════════════
 
-const PINTEREST_SCOPES = "boards:read,pins:write,user_accounts:read";
+const PINTEREST_SCOPES = "boards:read,boards:write,pins:read,pins:write,user_accounts:read";
 
 // GET /oauth/pinterest/boards
 // Returns the user's Pinterest boards. Used by Studio to populate the
