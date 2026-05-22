@@ -12,7 +12,10 @@ CREATE TABLE IF NOT EXISTS users (
   -- Stripe
   stripe_customer_id  TEXT UNIQUE,
   subscription_status TEXT NOT NULL DEFAULT 'inactive',
-    -- inactive | trialing | active | past_due | canceled
+    -- inactive | trialing | active | past_due | paused | canceled | unpaid | incomplete
+    -- Granted access (requireSubscription.js): trialing, active
+    -- Recoverable lockout: past_due, paused (e.g. comp trial ended without card)
+    -- Hard lockout: canceled, unpaid, incomplete, inactive
   subscription_id     TEXT,
   trial_ends_at       TIMESTAMPTZ,
   current_period_end  TIMESTAMPTZ,
@@ -49,14 +52,26 @@ CREATE TABLE IF NOT EXISTS oauth_tokens (
 
 -- ─── Waitlist (public — landing page signups) ────────────────────────────────
 CREATE TABLE IF NOT EXISTS waitlist (
-  id         UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  email      TEXT NOT NULL,
-  source     TEXT NOT NULL DEFAULT 'real_estate',
-    -- real_estate | restaurant | retail
-  notified   BOOLEAN NOT NULL DEFAULT FALSE,
-  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  id              UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  email           TEXT NOT NULL,
+  source          TEXT NOT NULL DEFAULT 'real_estate',
+    -- real_estate | restaurant | retail | conference_2026
+  notified        BOOLEAN NOT NULL DEFAULT FALSE,
+  -- Founding members: first 100 conference_2026 signups locked at $49/month for life
+  founding_member BOOLEAN NOT NULL DEFAULT FALSE,
+  founding_number INTEGER,
+  created_at      TIMESTAMPTZ NOT NULL DEFAULT NOW(),
   UNIQUE(email, source)
 );
+
+-- Only one row can hold each founding number (1..100). Safety net against races.
+CREATE UNIQUE INDEX IF NOT EXISTS uniq_waitlist_founding_number
+  ON waitlist (founding_number)
+  WHERE founding_number IS NOT NULL;
+
+CREATE INDEX IF NOT EXISTS idx_waitlist_conference_founding
+  ON waitlist (source, founding_member)
+  WHERE source = 'conference_2026';
 
 -- ─── Scheduled posts (server-side, fires even when Mac is off) ───────────────
 CREATE TABLE IF NOT EXISTS scheduled_posts (

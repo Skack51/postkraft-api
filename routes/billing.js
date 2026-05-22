@@ -85,18 +85,21 @@ router.post("/cancel", requireAuth, async (req, res, next) => {
       return res.status(400).json({ error: "No active subscription found" });
     }
 
-    await stripe.subscriptions.update(subscriptionId, {
+    const sub = await stripe.subscriptions.update(subscriptionId, {
       cancel_at_period_end: true,
     });
 
-    // Reflect this in our DB immediately so the UI can update
-    await db.query(
-      `UPDATE users SET subscription_status = 'canceled' WHERE id = $1`,
-      [req.user.id]
-    );
+    // DO NOT flip subscription_status to 'canceled' here — the user paid for
+    // the period and should keep access until current_period_end. The
+    // customer.subscription.updated and customer.subscription.deleted
+    // webhooks will reflect the real state when Stripe transitions it.
 
-    console.log(`🚫 Subscription scheduled for cancellation: ${subscriptionId}`);
-    res.json({ success: true });
+    console.log(`🚫 Subscription scheduled for cancellation at period end: ${subscriptionId}`);
+    res.json({
+      success: true,
+      cancel_at_period_end: true,
+      access_ends_at: new Date(sub.current_period_end * 1000),
+    });
   } catch (err) {
     next(err);
   }
@@ -199,6 +202,24 @@ async function handleStripeEvent(event) {
         [invoice.customer]
       );
       console.log(`⚠️  Payment failed for customer ${invoice.customer}`);
+      break;
+    }
+
+    case "customer.subscription.trial_will_end": {
+      // Fires ~3 days before trial_end. Stripe also sends its own customer
+      // email if enabled in Settings → Subscriptions and emails. We log it
+      // here for visibility and as a hook for future automation
+      // (e.g. concierge SMS to comped beta users).
+      const sub = data.object;
+      const { rows } = await db.query(
+        `SELECT id, email, full_name FROM users WHERE subscription_id = $1`,
+        [sub.id]
+      );
+      const user = rows[0];
+      console.log(
+        `⏰ Trial ending soon: sub ${sub.id} for ${user?.email || "unknown"} ` +
+          `(trial_end: ${new Date(sub.trial_end * 1000).toISOString()})`
+      );
       break;
     }
 
