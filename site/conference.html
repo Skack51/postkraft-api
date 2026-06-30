@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>PostKraft — Your Free Month Starts Here</title>
+  <title>PostKraft — Your Founding Spot</title>
   <meta name="robots" content="noindex, nofollow" />
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
@@ -118,7 +118,7 @@
       border: 1px solid rgba(255,255,255,0.07);
       border-radius: 16px;
       padding: 1.75rem;
-      margin-bottom: 2rem;
+      margin-bottom: 1.25rem;
     }
     .offer-label {
       font-size: 0.7rem;
@@ -129,16 +129,60 @@
       margin-bottom: 0.5rem;
     }
     .offer-value {
-      font-size: 2.25rem;
+      font-size: 2rem;
       font-weight: 800;
       letter-spacing: -0.03em;
       color: #ffffff;
       margin-bottom: 0.4rem;
+      line-height: 1.15;
+    }
+    .offer-value .strike {
+      color: rgba(255,255,255,0.3);
+      text-decoration: line-through;
+      font-weight: 600;
     }
     .offer-desc {
       font-size: 0.875rem;
       color: var(--muted);
     }
+
+    /* Scarcity counter — hidden until 50 spots claimed */
+    .counter {
+      display: none;
+      background: rgba(167,139,250,0.06);
+      border: 1px solid rgba(167,139,250,0.18);
+      border-radius: 12px;
+      padding: 0.875rem 1.125rem;
+      margin-bottom: 1.5rem;
+      text-align: left;
+    }
+    .counter.visible { display: block; }
+    .counter-row {
+      display: flex;
+      justify-content: space-between;
+      align-items: baseline;
+      font-size: 0.85rem;
+      color: rgba(255,255,255,0.7);
+      margin-bottom: 0.5rem;
+    }
+    .counter-row strong { color: #fff; font-weight: 700; }
+    .counter-row .accent { color: #c084fc; font-weight: 700; }
+    .counter-bar {
+      width: 100%;
+      height: 4px;
+      background: rgba(255,255,255,0.06);
+      border-radius: 999px;
+      overflow: hidden;
+    }
+    .counter-fill {
+      height: 100%;
+      background: linear-gradient(90deg, #818cf8, #c084fc, #f472b6);
+      border-radius: 999px;
+      transition: width 0.4s ease;
+    }
+
+    /* Sold-out variant */
+    .offer.sold-out .offer-value { font-size: 1.5rem; color: #f472b6; }
 
     /* Form */
     .form {
@@ -213,14 +257,17 @@
 
     .success-msg {
       display: none;
-      padding: 1rem;
+      padding: 1rem 1.125rem;
       background: rgba(167,139,250,0.1);
       border: 1px solid rgba(167,139,250,0.2);
       border-radius: 10px;
       color: #a78bfa;
       font-size: 0.9rem;
       margin-bottom: 1rem;
+      text-align: left;
+      line-height: 1.55;
     }
+    .success-msg strong { color: #fff; font-weight: 700; }
 
     footer {
       margin-top: auto;
@@ -244,29 +291,37 @@
 
     <div class="badge">
       <div class="badge-dot"></div>
-      Conference Exclusive
+      Conference Founding Cohort
     </div>
 
-    <h1>Your first month<br>is <span class="gradient">on us.</span></h1>
+    <h1>30 days free,<br>then <span class="gradient">$49 for life.</span></h1>
 
     <p class="sub">
       Drop your listing photos into PostKraft. AI writes platform-optimized captions for Instagram, Facebook, LinkedIn, and X — then posts on your schedule.
     </p>
 
-    <div class="offer">
-      <div class="offer-label">Exclusive offer — conference attendees</div>
-      <div class="offer-value">30 days free.</div>
-      <div class="offer-desc">No credit card required. Your free month starts the day Sean activates your account — typically within 48 hours.</div>
+    <div class="offer" id="offer-block">
+      <div class="offer-label">Founding rate — first 100 attendees only</div>
+      <div class="offer-value">$49<span style="font-size:1.125rem;font-weight:600;color:rgba(255,255,255,0.5);">/mo</span> <span class="strike" style="font-size:1.125rem;">$79</span></div>
+      <div class="offer-desc">Locked for life as long as you stay subscribed. 30 days free, no credit card. Your trial starts the day Sean activates your account — typically within 48 hours.</div>
     </div>
 
-    <div class="form">
+    <div class="counter" id="counter">
+      <div class="counter-row">
+        <span><strong id="counter-claimed">0</strong> of <strong>100</strong> founding spots claimed</span>
+        <span class="accent" id="counter-remaining">100 left</span>
+      </div>
+      <div class="counter-bar">
+        <div class="counter-fill" id="counter-fill" style="width:0%"></div>
+      </div>
+    </div>
+
+    <div class="form" id="form">
       <input type="email" id="email-input" placeholder="your@email.com" />
-      <button onclick="handleSignup()">Reserve My Free Month</button>
+      <button id="submit-btn" onclick="handleSignup()">Claim My Founding Spot</button>
     </div>
-    <div class="success-msg" id="success-msg">
-      You're in. Sean will personally email you within 48 hours with your download link, your CONFERENCE26 activation code, and your 30 days free.
-    </div>
-    <p class="fine">$79/month after trial · Cancel anytime · No contracts</p>
+    <div class="success-msg" id="success-msg"></div>
+    <p class="fine" id="fine">$49/month for life · 30 days free · Cancel anytime</p>
 
     <div class="features">
       <div class="feature">
@@ -290,13 +345,50 @@
   <script>
     const API = 'https://postkraft-api-production.up.railway.app';
 
+    // ─── Load founding-spot status on page open ──────────────────────────────
+    async function loadFoundingStatus() {
+      try {
+        const res = await fetch(`${API}/waitlist/founding-status`, { cache: 'no-store' });
+        if (!res.ok) return;
+        const data = await res.json();
+        const { claimed = 0, total = 100, remaining = 100, showCounter, soldOut } = data;
+
+        if (soldOut) {
+          renderSoldOut();
+          return;
+        }
+
+        if (showCounter) {
+          document.getElementById('counter-claimed').textContent = claimed;
+          document.getElementById('counter-remaining').textContent = `${remaining} left`;
+          document.getElementById('counter-fill').style.width = `${Math.min(100, (claimed / total) * 100)}%`;
+          document.getElementById('counter').classList.add('visible');
+        }
+      } catch (err) {
+        // Silent — the offer still stands without the live counter.
+        console.warn('founding-status failed', err);
+      }
+    }
+
+    function renderSoldOut() {
+      const offer = document.getElementById('offer-block');
+      offer.classList.add('sold-out');
+      offer.querySelector('.offer-label').textContent = 'Founding cohort — fully claimed';
+      offer.querySelector('.offer-value').innerHTML = 'All 100 founding spots claimed';
+      offer.querySelector('.offer-desc').textContent = 'You can still claim your 30 days free at the standard $79/month rate — same product, same activation, same Sean answering your emails.';
+      document.querySelector('h1').innerHTML = '30 days free,<br>then <span class="gradient">$79.</span>';
+      document.getElementById('submit-btn').textContent = 'Reserve My Free Month';
+      document.getElementById('fine').textContent = '$79/month after trial · 30 days free · Cancel anytime';
+    }
+
     async function handleSignup() {
       const email = document.getElementById('email-input').value.trim();
       if (!email || !email.includes('@')) {
         document.getElementById('email-input').focus();
         return;
       }
-      const btn = document.querySelector('button');
+      const btn = document.getElementById('submit-btn');
+      const originalLabel = btn.textContent;
       btn.textContent = 'Saving...';
       btn.disabled = true;
       try {
@@ -306,10 +398,20 @@
           body: JSON.stringify({ email, source: 'conference_2026' }),
         });
         if (!res.ok) throw new Error();
-        document.querySelector('.form').style.display = 'none';
-        document.getElementById('success-msg').style.display = 'block';
+        const data = await res.json().catch(() => ({}));
+
+        const msg = document.getElementById('success-msg');
+        if (data.foundingMember && data.foundingNumber) {
+          msg.innerHTML = `You're in. You claimed <strong>founding spot #${data.foundingNumber} of 100</strong> — your <strong>$49/mo for life</strong> is locked. Sean will personally email you within 48 hours with your download link and your CONFERENCE26 activation code.`;
+        } else {
+          msg.innerHTML = `You're in. The founding cohort is fully claimed, but you're locked at the standard <strong>$79/mo</strong>. Sean will personally email you within 48 hours with your download link and your CONFERENCE26 activation code.`;
+        }
+        document.getElementById('form').style.display = 'none';
+        document.getElementById('fine').style.display = 'none';
+        document.getElementById('counter').style.display = 'none';
+        msg.style.display = 'block';
       } catch {
-        btn.textContent = 'Claim My Free Month';
+        btn.textContent = originalLabel;
         btn.disabled = false;
         alert('Something went wrong — email us at hello@postkraft.app');
       }
@@ -318,6 +420,8 @@
     document.getElementById('email-input').addEventListener('keydown', e => {
       if (e.key === 'Enter') handleSignup();
     });
+
+    loadFoundingStatus();
   </script>
 </body>
 </html>

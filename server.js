@@ -9,7 +9,10 @@ const aiRoutes = require("./routes/ai");
 const socialRoutes = require("./routes/social");
 const scheduleRoutes = require("./routes/schedule");
 const waitlistRoutes = require("./routes/waitlist");
+const photosRoutes = require("./routes/photos");
+const batchRoutes = require("./routes/batch");
 const { startScheduler } = require("./lib/scheduler");
+const { runMigrations } = require("./db/migrate");
 
 const app = express();
 
@@ -45,6 +48,8 @@ app.use("/ai", aiRoutes);
 app.use("/social", socialRoutes);
 app.use("/schedule", scheduleRoutes);
 app.use("/waitlist", waitlistRoutes);
+app.use("/photos", photosRoutes);
+app.use("/batch", batchRoutes);
 
 // ─── 404 ─────────────────────────────────────────────────────────────────────
 app.use((_req, res) => res.status(404).json({ error: "Not found" }));
@@ -57,7 +62,16 @@ app.use((err, _req, res, _next) => {
 
 // ─── Start ───────────────────────────────────────────────────────────────────
 const PORT = process.env.PORT || 3000;
-app.listen(PORT, () => {
-  console.log(`PostKraft API running on port ${PORT}`);
-  startScheduler();
-});
+
+// Apply any pending DB migrations before accepting traffic, then start.
+(async () => {
+  try {
+    await runMigrations();
+  } catch (err) {
+    console.error("[startup] migration runner error:", err.message);
+  }
+  app.listen(PORT, () => {
+    console.log(`PostKraft API running on port ${PORT}`);
+    startScheduler();
+  });
+})();

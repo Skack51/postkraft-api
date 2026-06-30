@@ -9,6 +9,14 @@ router.use(cors());
 
 const VALID_SOURCES = ["real_estate", "restaurant", "retail", "conference_2026"];
 
+// First 100 conference_2026 signups lock in $49/month for life.
+const FOUNDING_CAP = 100;
+// Public counter on the conference page stays hidden until this many spots claimed.
+const COUNTER_REVEAL_AT = 50;
+// Advisory-lock key — any int unique to "conference founding allocation".
+// Stays well inside JS safe-integer range; pg driver serializes as int8.
+const FOUNDING_LOCK_KEY = 902614000001;
+
 const SOURCE_COPY = {
   real_estate: {
     subject: "You're on the PostKraft list",
@@ -25,15 +33,35 @@ const SOURCE_COPY = {
     headline: "You're in.",
     body: "Thanks for jumping on the PostKraft waitlist. You're one of the first retail brands on the list — your spot is locked at the founding member rate of $49/month, forever.",
   },
-  conference_2026: {
-    subject: "Your PostKraft access — what happens next",
-    headline: "You're in.",
-    body: "Thanks for scanning at the conference. Here's exactly what happens next.<br/><br/>I'm hand-activating every conference attendee this week. Within 48 hours, you'll get a separate email from me with your download link for the PostKraft Mac app, your <strong>CONFERENCE26</strong> activation code that unlocks 30 days completely free, and the founding member rate of $49/month locked in forever after your trial — instead of the standard $79.<br/><br/>I'm keeping the founding cohort small on purpose. You're in.",
-  },
 };
 
-function welcomeHtml(source) {
-  const { headline, body } = SOURCE_COPY[source] || SOURCE_COPY.real_estate;
+function conferenceFounderCopy(foundingNumber) {
+  return {
+    subject: `You claimed founding spot #${foundingNumber} — locked at $49/mo for life`,
+    headline: "You're in. And you locked the founding rate.",
+    body: `Thanks for scanning at the conference. Here's exactly what happens next.<br/><br/>You're <strong>founding member #${foundingNumber} of ${FOUNDING_CAP}</strong> — which means you've locked in the <strong>$49/month founding rate for life</strong> (instead of the standard $79), as long as you stay subscribed.<br/><br/>I'm hand-activating every conference attendee this week. Within 48 hours, you'll get a separate email from me with your download link for the PostKraft Mac app, your <strong>CONFERENCE26</strong> activation code that unlocks 30 days completely free, and your founding rate already wired into your account.<br/><br/>Only ${FOUNDING_CAP} of these spots exist. You're in.`,
+  };
+}
+
+function conferenceLateCopy() {
+  return {
+    subject: "Your PostKraft access — what happens next",
+    headline: "You're in.",
+    body: `Thanks for scanning at the conference. Here's exactly what happens next.<br/><br/>The founding cohort of ${FOUNDING_CAP} ($49/month for life) is fully claimed, but you're locked in on the standard rate of $79/month after your free month.<br/><br/>I'm hand-activating every conference attendee this week. Within 48 hours, you'll get a separate email from me with your download link, your <strong>CONFERENCE26</strong> activation code, and your account ready to go.`,
+  };
+}
+
+function copyFor(source, foundingNumber) {
+  if (source === "conference_2026") {
+    return foundingNumber
+      ? conferenceFounderCopy(foundingNumber)
+      : conferenceLateCopy();
+  }
+  return SOURCE_COPY[source] || SOURCE_COPY.real_estate;
+}
+
+function welcomeHtml(source, foundingNumber) {
+  const { headline, body } = copyFor(source, foundingNumber);
   const isConference = source === "conference_2026";
   const followUp = isConference
     ? "If you have any questions before then, just reply to this email."
@@ -57,8 +85,8 @@ function welcomeHtml(source) {
   </body></html>`;
 }
 
-function welcomeText(source) {
-  const { headline, body } = SOURCE_COPY[source] || SOURCE_COPY.real_estate;
+function welcomeText(source, foundingNumber) {
+  const { headline, body } = copyFor(source, foundingNumber);
   // Strip HTML tags from body so plain-text version renders cleanly
   const plainBody = body.replace(/<br\s*\/?>(\s*)/gi, "\n").replace(/<\/?(strong|b|em|i)>/gi, "");
   const isConference = source === "conference_2026";
@@ -68,12 +96,13 @@ function welcomeText(source) {
   return `${headline}\n\n${plainBody}\n\n${followUp}\n\nTalk soon,\nSean\n\n—\nSean Kalman · Founder, PostKraft\nThe Kalman Co. · Nantucket Island\n`;
 }
 
-async function sendWelcomeEmail(email, source) {
+async function sendWelcomeEmail(email, source, foundingNumber) {
   if (!process.env.RESEND_API_KEY) {
     console.warn("[waitlist] RESEND_API_KEY not set — skipping welcome email");
     return false;
   }
   try {
+    const { subject } = copyFor(source, foundingNumber);
     const res = await fetch("https://api.resend.com/emails", {
       method: "POST",
       headers: {
@@ -84,9 +113,9 @@ async function sendWelcomeEmail(email, source) {
         from: "Sean Kalman <sean@postkraft.app>",
         reply_to: "sean@postkraft.app",
         to: [email],
-        subject: SOURCE_COPY[source]?.subject || SOURCE_COPY.real_estate.subject,
-        html: welcomeHtml(source),
-        text: welcomeText(source),
+        subject,
+        html: welcomeHtml(source, foundingNumber),
+        text: welcomeText(source, foundingNumber),
       }),
     });
     if (!res.ok) {
@@ -98,6 +127,78 @@ async function sendWelcomeEmail(email, source) {
   } catch (err) {
     console.error("[waitlist] Resend error:", err.message);
     return false;
+  }
+}
+
+/**
+ * Atomically insert a conference_2026 row and (if there's a founding slot left)
+ * assign it. Uses a Postgres transactional advisory lock so concurrent inserts
+ * can't both grab the same founding number. Returns { row, foundingNumber }.
+ *
+ * row is null when the email already existed (ON CONFLICT did nothing).
+ * foundingNumber is null when source isn't conference_2026 or the cap is hit.
+ */
+async function insertWaitlistRow(email, source) {
+  const client = await db.getClient();
+  try {
+    await client.query("BEGIN");
+
+    // Advisory lock only matters for conference_2026 — it serializes the
+    // count-then-insert against other simultaneous conference signups.
+    let foundingNumber = null;
+    let foundingMember = false;
+    if (source === "conference_2026") {
+      await client.query("SELECT pg_advisory_xact_lock($1)", [FOUNDING_LOCK_KEY]);
+      const { rows: countRows } = await client.query(
+        `SELECT COUNT(*)::int AS claimed
+         FROM waitlist
+         WHERE source = 'conference_2026' AND founding_member = TRUE`
+      );
+      const claimed = countRows[0]?.claimed ?? 0;
+      if (claimed < FOUNDING_CAP) {
+        foundingNumber = claimed + 1;
+        foundingMember = true;
+      }
+    }
+
+    const { rows } = await client.query(
+      `INSERT INTO waitlist (email, source, founding_member, founding_number)
+       VALUES ($1, $2, $3, $4)
+       ON CONFLICT (email, source) DO NOTHING
+       RETURNING id, founding_member, founding_number`,
+      [email, source, foundingMember, foundingNumber]
+    );
+
+    if (rows.length === 0) {
+      // Duplicate email — fetch the existing row so we can echo their actual
+      // founding status back. The slot we tentatively reserved wasn't used; the
+      // advisory lock release on COMMIT lets the next signup claim it.
+      const { rows: existing } = await client.query(
+        `SELECT id, founding_member, founding_number
+         FROM waitlist
+         WHERE email = $1 AND source = $2`,
+        [email, source]
+      );
+      await client.query("COMMIT");
+      const ex = existing[0];
+      return {
+        row: null, // null = no fresh insert (so no welcome email re-send)
+        foundingNumber: ex?.founding_number ?? null,
+        alreadyFounding: Boolean(ex?.founding_member),
+      };
+    }
+
+    await client.query("COMMIT");
+    return {
+      row: rows[0],
+      foundingNumber: rows[0].founding_number,
+      alreadyFounding: false,
+    };
+  } catch (err) {
+    await client.query("ROLLBACK").catch(() => {});
+    throw err;
+  } finally {
+    client.release();
   }
 }
 
@@ -115,31 +216,55 @@ router.post("/", async (req, res, next) => {
     const cleanEmail = email.toLowerCase().trim();
     const cleanSource = VALID_SOURCES.includes(source) ? source : "real_estate";
 
-    // RETURNING gives us a row only on a fresh insert — duplicates return nothing
-    const { rows } = await db.query(
-      `INSERT INTO waitlist (email, source)
-       VALUES ($1, $2)
-       ON CONFLICT (email, source) DO NOTHING
-       RETURNING id`,
-      [cleanEmail, cleanSource]
-    );
+    const { row, foundingNumber, alreadyFounding } = await insertWaitlistRow(cleanEmail, cleanSource);
 
-    // Respond immediately — don't make the user wait on Resend
-    res.json({ success: true });
+    // Respond immediately — don't make the user wait on Resend.
+    // For duplicates, echo their actual founding status so the success message
+    // matches reality.
+    res.json({
+      success: true,
+      foundingMember: Boolean(row?.founding_member) || alreadyFounding,
+      foundingNumber: foundingNumber || null,
+      duplicate: !row,
+    });
 
     // Fire welcome email async (only on a fresh signup)
-    if (rows.length > 0) {
-      sendWelcomeEmail(cleanEmail, cleanSource)
+    if (row) {
+      sendWelcomeEmail(cleanEmail, cleanSource, foundingNumber)
         .then((ok) => {
           if (ok) {
             return db.query(
               `UPDATE waitlist SET notified = TRUE WHERE id = $1`,
-              [rows[0].id]
+              [row.id]
             );
           }
         })
         .catch((err) => console.error("[waitlist] post-response error:", err));
     }
+  } catch (err) {
+    next(err);
+  }
+});
+
+// GET /waitlist/founding-status
+// Public — used by the conference landing page to render the scarcity counter.
+// Counter stays hidden until COUNTER_REVEAL_AT spots are claimed.
+router.get("/founding-status", async (_req, res, next) => {
+  try {
+    const { rows } = await db.query(
+      `SELECT COUNT(*)::int AS claimed
+       FROM waitlist
+       WHERE source = 'conference_2026' AND founding_member = TRUE`
+    );
+    const claimed = rows[0]?.claimed ?? 0;
+    res.json({
+      claimed,
+      total: FOUNDING_CAP,
+      remaining: Math.max(0, FOUNDING_CAP - claimed),
+      showCounter: claimed >= COUNTER_REVEAL_AT,
+      revealAt: COUNTER_REVEAL_AT,
+      soldOut: claimed >= FOUNDING_CAP,
+    });
   } catch (err) {
     next(err);
   }
