@@ -1,0 +1,60 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="robots" content="noindex, nofollow">
+<title>PostKraft sign-in</title>
+<style>
+  body { margin: 0; min-height: 100vh; display: flex; align-items: center; justify-content: center;
+         background: #08080f; color: #e8e8f0; font: 16px/1.5 -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; }
+  main { max-width: 420px; padding: 32px; text-align: center; }
+  h1 { font-size: 20px; margin: 0 0 12px; }
+  p { margin: 0 0 8px; color: #b8b8c8; }
+  .hidden { display: none; }
+</style>
+</head>
+<body>
+<main>
+  <div id="working">
+    <h1>Finishing sign-in</h1>
+    <p>Handing the result to PostKraft on this Mac.</p>
+  </div>
+  <div id="stuck" class="hidden">
+    <h1>PostKraft is not listening</h1>
+    <p>Open PostKraft, click Connect again, and come back here.</p>
+  </div>
+  <div id="refused" class="hidden">
+    <h1>The platform refused the connection</h1>
+    <p id="refused-why"></p>
+    <p>You can close this window and try again from PostKraft.</p>
+  </div>
+</main>
+<script>
+  // This page stores nothing and logs nothing. It only forwards the query
+  // string the platform sent here to the loopback listener PostKraft opens
+  // while a Connect is in progress (see electron/oauth.cjs, LOOPBACK_PORT).
+  (function () {
+    var q = window.location.search;
+    var params = new URLSearchParams(q);
+    var show = function (id) {
+      ["working", "stuck", "refused"].forEach(function (x) {
+        document.getElementById(x).classList.toggle("hidden", x !== id);
+      });
+    };
+    if (!params.get("state")) {
+      show("stuck");
+      return;
+    }
+    if (params.get("error") && !params.get("code")) {
+      document.getElementById("refused-why").textContent =
+        params.get("error_description") || params.get("error");
+    }
+    var target = "http://127.0.0.1:47831/oauth/callback" + q;
+    var timer = setTimeout(function () { show("stuck"); }, 3000);
+    window.addEventListener("pagehide", function () { clearTimeout(timer); });
+    window.location.replace(target);
+  })();
+</script>
+</body>
+</html>
